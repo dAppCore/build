@@ -27,6 +27,10 @@ inputs:
     description: "Cache the build"
     required: false
     default: "true"
+  build-dependency-path:
+    description: "Used to specify the path to a dependency file - go.sum"
+    required: false
+    default: "go.sum"
   build-platform:
     description: "Platform to build for"
     required: false
@@ -162,7 +166,7 @@ runs:
       with:
         check-latest: true
         cache: ${{ inputs.build-cache }}
-        cache-dependency-path: 'go.sum'
+        cache-dependency-path: ${{ inputs.build-dependency-path }}
         go-version: ${{ inputs.go-version }}
     - name: Install Garble
       if: inputs.build-obfuscate == 'true'
