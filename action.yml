@@ -20,6 +20,14 @@ inputs:
     description: "Build a Windows Installer"
     required: false
     default: "false"
+  upx:
+    description: "Compress the build using upx, the Ultimate Packer for eXecutables."
+    required: false
+    default: "false"
+  upx-flags:
+    description: "Flags to pass to upx compress tool"
+    required: false
+    default: ""
   build-name:
     description: "The name of the binary file"
     required: true
@@ -158,6 +166,12 @@ runs:
         if ${{ inputs.nsis == 'true' }}; then
           build_options+=' -nsis'
         fi
+        if ${{ inputs.upx == 'true' }}; then
+          build_options+=' -upx'
+          if [[ "${{ inputs.upx-flags }}" != "" ]]; then
+            build_options+=" -upxflags='${{ inputs.upx-flags }}'"
+          fi
+        fi
         echo "BUILD_OPTIONS=$build_options" >> "$GITHUB_OUTPUT"
     # Setup and configure GoLang
     - name: Setup GoLang
@@ -185,6 +199,19 @@ runs:
       shell: bash
       working-directory: ${{inputs.deno-working-directory}}
       run: ${{inputs.deno-build}}
+    # install upx
+    - name: Install UPX Linux
+      if: inputs.upx == 'true' && runner.os == 'Linux'
+      run: sudo apt-get -yq install upx
+      shell: bash
+    - name: Install UPX Windows
+      if: inputs.upx == 'true' && runner.os == 'Windows'
+      run: choco install upx
+      shell: bash
+    - name: Install UPX macOS
+      if: inputs.upx == 'true' && runner.os == 'macOS'
+      run: brew install upx
+      shell: bash
     # install wails
     - name: Install Wails
       if: inputs.build == 'true' && inputs.wails-dev-build == 'false'
