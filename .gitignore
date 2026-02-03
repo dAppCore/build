@@ -2,3 +2,8 @@
 build/wails2/build/bin
 build/wails2/node_modules
 build/wails2/frontend/dist
+
+# TDD test artifacts
+tdd/.build/
+tdd/**/node_modules/
+tdd/tdd/
