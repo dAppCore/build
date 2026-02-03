@@ -48,10 +48,9 @@ runs:
           raw="${raw//,/ }"
           # collapse multiple spaces
           raw=$(echo "$raw" | tr -s ' ')
-          declare -A seen=()
+          # deduplicate tags (bash 3.x compatible - no associative arrays)
           for t in $raw; do
-            if [[ -n "$t" && -z "${seen[$t]:-}" ]]; then
-              seen[$t]=1
+            if [[ -n "$t" ]] && [[ " $norm_tags " != *" $t "* ]]; then
               norm_tags+=" $t"
             fi
           done
