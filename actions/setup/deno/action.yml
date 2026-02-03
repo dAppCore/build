@@ -31,7 +31,8 @@ runs:
         if [ -z "$deno_version" ]; then deno_version="$INPUT_DENO_VERSION"; fi
         if [ -z "$deno_workdir" ]; then deno_workdir="$INPUT_DENO_WORKDIR"; fi
         enabled=0
-        case "${deno_enable,,}" in
+        deno_enable_lc=$(echo "$deno_enable" | tr '[:upper:]' '[:lower:]')
+        case "$deno_enable_lc" in
           true|1|yes|on) enabled=1;;
         esac
         if [ -n "$deno_build" ]; then enabled=1; fi

@@ -147,7 +147,7 @@ runs:
         # helper to pick first non-empty
         pick() { if [ -n "$1" ] && [ "$1" != "false" ]; then echo "$1"; else echo "$2"; fi }
         # booleans normalize
-        tobool() { case "${1,,}" in true|1|yes|on) echo "true";; *) echo "false";; esac }
+        tobool() { local v; v=$(echo "$1" | tr '[:upper:]' '[:lower:]'); case "$v" in true|1|yes|on) echo "true";; *) echo "false";; esac }
         BUILD_TAGS=$(pick "${IN_BUILD_TAGS:-}" "${EV_BUILD_TAGS:-}")
         OBFUSCATE=$(tobool "$(pick "${IN_OBFUSCATE:-}" "${EV_OBFUSCATE:-}")")
         NSIS=$(tobool "$(pick "${IN_NSIS:-}" "${EV_NSIS:-}")")
@@ -215,7 +215,8 @@ runs:
         set -euo pipefail
         npm_enable="${NPM_ENABLE:-}"
         npm_packages="${NPM_PACKAGES:-}"
-        case "${npm_enable,,}" in
+        npm_enable_lc=$(echo "$npm_enable" | tr '[:upper:]' '[:lower:]')
+        case "$npm_enable_lc" in
           true|1|yes|on) enable=1;;
           *) enable=0;;
         esac
