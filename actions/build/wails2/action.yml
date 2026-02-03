@@ -1,6 +1,10 @@
 name: "Wails v2 (full pipeline)"
 description: "Runs the full Wails v2 build pipeline: discovery, options, setup (Go/Deno/Wails), build, sign, and package"
 inputs:
+  version:
+    description: "Action version/ref"
+    required: false
+    default: "dev"
   build:
     description: "Whether to run the build"
     required: false
@@ -181,13 +185,13 @@ runs:
 
     - name: Discovery
       id: discovery
-      uses: ./actions/discovery
+      uses: host-uk/build/actions/discovery@${{ inputs.version }}
       with:
         working-directory: ${{ inputs.app-working-directory }}
 
     - name: Compute Build Options
       id: build_options
-      uses: ./actions/options
+      uses: host-uk/build/actions/options@${{ inputs.version }}
       with:
         build-obfuscate: ${{ steps.wcfg.outputs.OBFUSCATE }}
         build-tags: ${{ steps.wcfg.outputs.BUILD_TAGS }}
@@ -195,8 +199,9 @@ runs:
         distro: ${{ steps.discovery.outputs.DISTRO }}
 
     - name: Setup toolchains (Go/Node/Deno/Wails)
-      uses: ./actions/setup
+      uses: host-uk/build/actions/setup@${{ inputs.version }}
       with:
+        version: ${{ inputs.version }}
         go-version: ${{ steps.wcfg.outputs.GO_VER }}
         build-cache: ${{ inputs.build-cache }}
         build-obfuscate: ${{ steps.wcfg.outputs.OBFUSCATE }}
@@ -232,7 +237,7 @@ runs:
         npm install -g $npm_packages
 
     - name: Build Wails app
-      uses: ./actions/build/wails2/build
+      uses: host-uk/build/actions/build/wails2/build@${{ inputs.version }}
       with:
         build: ${{ inputs.build }}
         app-working-directory: ${{ inputs.app-working-directory }}
@@ -242,7 +247,7 @@ runs:
         build-options: ${{ steps.build_options.outputs.BUILD_OPTIONS }}
 
     - name: Sign artifacts (OS-conditional)
-      uses: ./actions/sign
+      uses: host-uk/build/actions/sign@${{ inputs.version }}
       with:
         sign: ${{ inputs.sign }}
         app-working-directory: ${{ inputs.app-working-directory }}
@@ -258,7 +263,7 @@ runs:
         sign-windows-cert-password: ${{ steps.wcfg.outputs.SIGN_WINDOWS_CERT_PASSWORD }}
 
     - name: Package & release
-      uses: ./actions/package
+      uses: host-uk/build/actions/package@${{ inputs.version }}
       with:
         package: ${{ inputs.package }}
         build-name: ${{ inputs.build-name }}
