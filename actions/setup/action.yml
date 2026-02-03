@@ -1,9 +1,6 @@
 name: "Setup toolchains"
 description: "Orchestrates language/tool setup by delegating to sub-actions: setup/go, setup/npm, setup/deno, setup/conan"
 inputs:
-  version:
-    required: false
-    default: "dev"
   # Go/Wails
   go-version:
     required: false
@@ -48,7 +45,7 @@ runs:
   using: "composite"
   steps:
     - name: Setup Go
-      uses: host-uk/build/actions/setup/go@${{ inputs.version }}
+      uses: host-uk/build/actions/setup/go@dev
       with:
         go-version: ${{ inputs.go-version }}
         build-cache: ${{ inputs.build-cache }}
@@ -56,17 +53,17 @@ runs:
         wails-version: ${{ inputs.wails-version }}
         wails-dev-build: ${{ inputs.wails-dev-build }}
     - name: Setup Node/npm
-      uses: host-uk/build/actions/setup/npm@${{ inputs.version }}
+      uses: host-uk/build/actions/setup/npm@dev
       with:
         node-version: ${{ inputs.node-version }}
         working-directory: ${{ inputs.npm-working-directory }}
         install: ${{ inputs.npm-install }}
     - name: Setup Deno (optional)
-      uses: host-uk/build/actions/setup/deno@${{ inputs.version }}
+      uses: host-uk/build/actions/setup/deno@dev
       with:
         deno-build: ${{ inputs.deno-build }}
         deno-version: ${{ inputs.deno-version }}
         deno-working-directory: ${{ inputs.deno-working-directory }}
     - name: Setup Conan (optional)
       if: inputs.conan-enable == 'true'
-      uses: host-uk/build/actions/setup/conan@${{ inputs.version }}
+      uses: host-uk/build/actions/setup/conan@dev

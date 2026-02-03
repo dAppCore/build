@@ -1,10 +1,6 @@
 name: "Directory Orchestrator"
 description: "Selects and delegates to a stack wrapper based on discovery outputs and ENV"
 inputs:
-  version:
-    required: false
-    default: "dev"
-    description: "Action version/ref"
   build:
     required: false
     default: "true"
@@ -76,9 +72,8 @@ runs:
 
     - name: Call Wails v2 wrapper
       if: steps.sel.outputs.SELECTED_STACK == 'wails2'
-      uses: host-uk/build/actions/build/wails2@${{ inputs.version }}
+      uses: host-uk/build/actions/build/wails2@dev
       with:
-        version: ${{ inputs.version }}
         build: ${{ inputs.build }}
         sign: ${{ inputs.sign }}
         package: ${{ inputs.package }}

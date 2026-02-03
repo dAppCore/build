@@ -4,10 +4,6 @@ branding:
   icon: 'box'
   color: 'purple'
 inputs:
-  version:
-    description: "Action version/ref to use (branch, tag, or SHA)"
-    required: false
-    default: "dev"
   build:
     description: "Whether to run the build"
     required: false
@@ -49,15 +45,14 @@ runs:
   steps:
     - name: Discovery
       id: discovery
-      uses: host-uk/build/actions/discovery@${{ inputs.version }}
+      uses: host-uk/build/actions/discovery@dev
       with:
         working-directory: ${{ inputs.app-working-directory }}
 
     - name: Delegate to directory orchestrator
       id: dir_orch
-      uses: host-uk/build/actions@${{ inputs.version }}
+      uses: host-uk/build/actions@dev
       with:
-        version: ${{ inputs.version }}
         build: ${{ inputs.build }}
         sign: ${{ inputs.sign }}
         package: ${{ inputs.package }}
@@ -75,7 +70,7 @@ runs:
       run: echo "[DEBUG_LOG] (root) Orchestrator selected stack=${{ steps.dir_orch.outputs.SELECTED_STACK }}"
 
     - name: Package & release
-      uses: host-uk/build/actions/package@${{ inputs.version }}
+      uses: host-uk/build/actions/package@dev
       with:
         package: ${{ inputs.package }}
         build-name: ${{ inputs.build-name }}
