@@ -133,6 +133,8 @@ runs:
         suggestion="unknown"
         if { [ "$has_go_mod" -eq 1 ] || [ "$has_main_go" -eq 1 ]; } && { [ "$has_root_pkg" -eq 1 ] || [ "$has_frontend_pkg" -eq 1 ] || [ "$has_sub_npm" -eq 1 ]; }; then
           suggestion="wails2"
+        elif [ "$has_go_mod" -eq 1 ]; then
+          suggestion="core"
         elif [ "$has_cmake" -eq 1 ]; then
           suggestion="cpp"
         fi
@@ -181,6 +183,7 @@ runs:
         Get-ChildItem -Recurse -Depth 2 -Filter mkdocs.yml -ErrorAction SilentlyContinue | ForEach-Object { $has_sub_mkdocs=1 }
         $suggestion = "unknown"
         if ((($has_go_mod -eq 1) -or ($has_main_go -eq 1)) -and (($has_root_pkg -eq 1) -or ($has_frontend_pkg -eq 1) -or ($has_sub_npm -eq 1))) { $suggestion = "wails2" }
+        elseif ($has_go_mod -eq 1) { $suggestion = "core" }
         elseif ($has_cmake -eq 1) { $suggestion = "cpp" }
         Write-Host "[DEBUG_LOG] HAS_ROOT_PACKAGE_JSON=$has_root_pkg"
         Write-Host "[DEBUG_LOG] HAS_FRONTEND_PACKAGE_JSON=$has_frontend_pkg"

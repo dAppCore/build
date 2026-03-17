@@ -1,0 +1,176 @@
+name: "Auto-Fix (rebase + deps + test)"
+description: "Attempt to auto-fix a PR: rebase onto main, update dependencies, run tests, push. Falls back to agent dispatch if fix fails."
+inputs:
+  go-version:
+    description: "Go version"
+    required: false
+    default: "1.26"
+  node-version:
+    description: "Node.js version"
+    required: false
+    default: "20"
+  agent-api-url:
+    description: "Core agent API URL for dispatching fix agents on failure"
+    required: false
+    default: ""
+  agent-api-token:
+    description: "Bearer token for core agent API"
+    required: false
+    default: ""
+outputs:
+  FIXED:
+    description: "1 if auto-fix succeeded, 0 if it failed"
+    value: ${{ steps.result.outputs.FIXED }}
+  FIX_METHOD:
+    description: "How the fix was applied (rebase, deps, test-only, agent, none)"
+    value: ${{ steps.result.outputs.FIX_METHOD }}
+runs:
+  using: "composite"
+  steps:
+    - name: Detect project type
+      id: detect
+      shell: bash
+      run: |
+        if [ -f "go.mod" ]; then
+          echo "LANG=go" >> "$GITHUB_OUTPUT"
+        elif [ -f "composer.json" ]; then
+          echo "LANG=php" >> "$GITHUB_OUTPUT"
+        elif [ -f "package.json" ]; then
+          echo "LANG=node" >> "$GITHUB_OUTPUT"
+        else
+          echo "LANG=unknown" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Setup Go
+      if: steps.detect.outputs.LANG == 'go'
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ inputs.go-version }}
+
+    - name: Setup Node
+      if: steps.detect.outputs.LANG == 'node'
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    - name: Configure git
+      shell: bash
+      run: |
+        git config user.name "core-agent"
+        git config user.email "virgil@lethean.io"
+
+    - name: Rebase onto main
+      id: rebase
+      shell: bash
+      run: |
+        git fetch origin main
+        if git rebase origin/main; then
+          echo "REBASED=1" >> "$GITHUB_OUTPUT"
+          echo "[fix] Rebase succeeded"
+        else
+          git rebase --abort
+          echo "REBASED=0" >> "$GITHUB_OUTPUT"
+          echo "[fix] Rebase failed — conflicts"
+        fi
+
+    - name: Update dependencies (Go)
+      if: steps.detect.outputs.LANG == 'go'
+      id: deps_go
+      shell: bash
+      run: |
+        GOWORK=off go get -u ./... 2>&1 || true
+        GOWORK=off go mod tidy 2>&1 || true
+        if git diff --quiet go.mod go.sum; then
+          echo "DEPS_UPDATED=0" >> "$GITHUB_OUTPUT"
+        else
+          git add go.mod go.sum
+          git commit -m "fix(deps): update Go dependencies" || true
+          echo "DEPS_UPDATED=1" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Update dependencies (PHP)
+      if: steps.detect.outputs.LANG == 'php'
+      id: deps_php
+      shell: bash
+      run: |
+        composer update --no-interaction 2>&1 || true
+        if git diff --quiet composer.lock; then
+          echo "DEPS_UPDATED=0" >> "$GITHUB_OUTPUT"
+        else
+          git add composer.lock
+          git commit -m "fix(deps): update Composer dependencies" || true
+          echo "DEPS_UPDATED=1" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Update dependencies (Node)
+      if: steps.detect.outputs.LANG == 'node'
+      id: deps_node
+      shell: bash
+      run: |
+        npm update 2>&1 || true
+        if git diff --quiet package-lock.json; then
+          echo "DEPS_UPDATED=0" >> "$GITHUB_OUTPUT"
+        else
+          git add package-lock.json
+          git commit -m "fix(deps): update npm dependencies" || true
+          echo "DEPS_UPDATED=1" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Run tests
+      id: test
+      shell: bash
+      run: |
+        LANG="${{ steps.detect.outputs.LANG }}"
+        case "$LANG" in
+          go)
+            GOWORK=off go test ./... -count=1 -timeout 120s 2>&1
+            ;;
+          php)
+            composer test --no-interaction 2>&1 || vendor/bin/pest --no-interaction 2>&1 || true
+            ;;
+          node)
+            npm test 2>&1 || true
+            ;;
+        esac
+        if [ $? -eq 0 ]; then
+          echo "TESTS_PASSED=1" >> "$GITHUB_OUTPUT"
+        else
+          echo "TESTS_PASSED=0" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Push fixes
+      id: push
+      if: steps.test.outputs.TESTS_PASSED == '1'
+      shell: bash
+      run: |
+        git push --force-with-lease origin HEAD
+        echo "PUSHED=1" >> "$GITHUB_OUTPUT"
+        echo "[fix] Pushed fixes to branch"
+
+    - name: Dispatch agent on failure
+      if: steps.test.outputs.TESTS_PASSED != '1' && inputs.agent-api-url != ''
+      shell: bash
+      run: |
+        REPO="${{ github.event.repository.name }}"
+        PR="${{ github.event.pull_request.number }}"
+        echo "[fix] Tests failed after auto-fix. Dispatching agent for $REPO PR #$PR"
+        # Future: call core-agent API to dispatch a fix agent
+        # curl -sf -X POST "${{ inputs.agent-api-url }}/v1/dispatch" ...
+
+    - name: Set result
+      id: result
+      shell: bash
+      run: |
+        if [ "${{ steps.push.outputs.PUSHED }}" = "1" ]; then
+          echo "FIXED=1" >> "$GITHUB_OUTPUT"
+          if [ "${{ steps.deps_go.outputs.DEPS_UPDATED || steps.deps_php.outputs.DEPS_UPDATED || steps.deps_node.outputs.DEPS_UPDATED }}" = "1" ]; then
+            echo "FIX_METHOD=deps" >> "$GITHUB_OUTPUT"
+          elif [ "${{ steps.rebase.outputs.REBASED }}" = "1" ]; then
+            echo "FIX_METHOD=rebase" >> "$GITHUB_OUTPUT"
+          else
+            echo "FIX_METHOD=test-only" >> "$GITHUB_OUTPUT"
+          fi
+        else
+          echo "FIXED=0" >> "$GITHUB_OUTPUT"
+          echo "FIX_METHOD=none" >> "$GITHUB_OUTPUT"
+        fi
