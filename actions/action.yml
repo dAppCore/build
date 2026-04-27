@@ -1,0 +1,86 @@
+name: "Directory Orchestrator"
+description: "Selects and delegates to a stack wrapper based on discovery outputs and ENV"
+inputs:
+  build:
+    required: false
+    default: "true"
+    description: ""
+  sign:
+    required: false
+    default: "false"
+    description: ""
+  package:
+    required: false
+    default: "true"
+    description: ""
+  build-name:
+    required: true
+    description: ""
+  build-platform:
+    required: false
+    default: "darwin/universal"
+    description: ""
+  app-working-directory:
+    required: false
+    default: "."
+    description: ""
+  # Orchestrator controls
+  AUTO_STACK:
+    required: false
+    default: "true"
+    description: ""
+  AUTO_SETUP:
+    required: false
+    default: "true"
+    description: ""
+  STACK:
+    required: false
+    default: ""
+    description: ""
+  # Optional hint from a prior discovery step
+  PRIMARY_STACK_SUGGESTION:
+    required: false
+    default: ""
+    description: ""
+runs:
+  using: "composite"
+  steps:
+    - name: Resolve stack selection
+      id: sel
+      shell: bash
+      env:
+        AUTO_STACK: ${{ inputs.AUTO_STACK }}
+        FORCED_STACK: ${{ inputs.STACK }}
+        HINT: ${{ inputs.PRIMARY_STACK_SUGGESTION }}
+      run: |
+        set -euo pipefail
+        sel_stack="wails2"
+        if [ -n "${FORCED_STACK:-}" ]; then
+          sel_stack="$FORCED_STACK"
+          echo "[DEBUG_LOG] (orchestrator) Forced stack via input STACK=$sel_stack"
+        elif [ "${AUTO_STACK:-true}" = "true" ] || [ "${AUTO_STACK:-true}" = "1" ]; then
+          if [ -n "${HINT:-}" ] && [ "$HINT" != "unknown" ]; then
+            sel_stack="$HINT"
+            echo "[DEBUG_LOG] (orchestrator) Auto stack=${sel_stack} (from discovery hint)"
+          else
+            echo "[DEBUG_LOG] (orchestrator) No hint; defaulting to wails2"
+          fi
+        else
+          echo "[DEBUG_LOG] (orchestrator) AUTO_STACK disabled; defaulting to wails2"
+        fi
+        echo "SELECTED_STACK=$sel_stack" >> "$GITHUB_OUTPUT"
+
+    - name: Call Wails v2 wrapper
+      if: steps.sel.outputs.SELECTED_STACK == 'wails2'
+      uses: host-uk/build/actions/build/wails2@dev
+      with:
+        build: ${{ inputs.build }}
+        sign: ${{ inputs.sign }}
+        package: ${{ inputs.package }}
+        build-name: ${{ inputs.build-name }}
+        build-platform: ${{ inputs.build-platform }}
+        app-working-directory: ${{ inputs.app-working-directory }}
+outputs:
+  SELECTED_STACK:
+    description: "Stack selected by the orchestrator"
+    value: ${{ steps.sel.outputs.SELECTED_STACK }}

@@ -1,0 +1,8 @@
+{
+  "name": "hello-http",
+  "version": "1.0.0",
+  "tasks": {
+    "start": "deno run --allow-net --allow-env main.ts",
+    "check": "deno check main.ts"
+  }
+}

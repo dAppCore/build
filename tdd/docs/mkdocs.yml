@@ -1,0 +1,3 @@
+site_name: Docs Fixture
+nav:
+  - Home: index.md

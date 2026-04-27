@@ -1,0 +1,42 @@
+name: "Setup Node and npm"
+description: "Installs Node.js and optionally installs dependencies (npm ci) in a detected project directory"
+inputs:
+  node-version:
+    required: false
+    default: "18.x"
+  working-directory:
+    required: false
+    default: "."
+  install:
+    required: false
+    default: "true"
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+        check-latest: true
+    - name: Show node and npm versions
+      shell: bash
+      run: |
+        node -v
+        npm -v
+    - name: Install npm dependencies (auto-detect path)
+      if: inputs.install == 'true'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        set -euo pipefail
+        install_dir="${{ inputs.working-directory }}"
+        if [ -f "package.json" ]; then
+          echo "Installing npm deps in $PWD"
+          npm ci || npm install
+        elif [ -f "frontend/package.json" ]; then
+          echo "Installing npm deps in frontend/"
+          cd frontend
+          npm ci || npm install
+        else
+          echo "No package.json found in working-directory or frontend/. Skipping npm install."
+        fi

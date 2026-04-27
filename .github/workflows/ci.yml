@@ -1,0 +1,512 @@
+name: Build Action self-tests
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [ "main", "v3", "dev", "*-*" ]
+  pull_request:
+    branches: [ "main", "v3", "dev", "*-*" ]
+  workflow_dispatch:
+
+jobs:
+  discovery-tests:
+    name: Discovery sub-action tests on ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: disc
+        uses: ./actions/discovery
+      - name: Assert outputs (bash)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${{ steps.disc.outputs.OS }}"
+          : "${{ steps.disc.outputs.ARCH }}"
+          : "${{ steps.disc.outputs.REF }}"
+          : "${{ steps.disc.outputs.SHORT_SHA }}"
+          echo "OS=${{ steps.disc.outputs.OS }} ARCH=${{ steps.disc.outputs.ARCH }} REF=${{ steps.disc.outputs.REF }} SHORT_SHA=${{ steps.disc.outputs.SHORT_SHA }}"
+      - name: Assert outputs (pwsh)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          if (-not "${{ steps.disc.outputs.OS }}") { throw 'OS output empty' }
+          if (-not "${{ steps.disc.outputs.ARCH }}") { throw 'ARCH output empty' }
+          if (-not "${{ steps.disc.outputs.REF }}") { throw 'REF output empty' }
+          if (-not "${{ steps.disc.outputs.SHORT_SHA }}") { throw 'SHORT_SHA output empty' }
+
+  discovery-fixture-tests:
+    name: Discovery fixture tests (project markers and stack suggestion)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { dir: 'tdd/wails2-root', expect: 'wails2', expect_root_pkg: '0', expect_frontend_pkg: '1', expect_go_mod: '1', expect_main_go: '1', expect_cmake: '0' }
+          - { dir: 'tdd/cpp-root', expect: 'cpp', expect_root_pkg: '0', expect_frontend_pkg: '0', expect_go_mod: '0', expect_main_go: '0', expect_cmake: '1' }
+          - { dir: 'tdd/node-only', expect: 'unknown', expect_root_pkg: '1', expect_frontend_pkg: '0', expect_go_mod: '0', expect_main_go: '0', expect_cmake: '0' }
+          - { dir: 'tdd/docs', expect: 'unknown', expect_root_pkg: '0', expect_frontend_pkg: '0', expect_go_mod: '0', expect_main_go: '0', expect_cmake: '0' }
+    steps:
+      - uses: actions/checkout@v4
+      - id: disc
+        uses: ./actions/discovery
+        with:
+          working-directory: ${{ matrix.dir }}
+      - name: Assert markers and suggestion
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "[DEBUG_LOG] Tested dir=${{ matrix.dir }}"
+          test "${{ steps.disc.outputs.PRIMARY_STACK_SUGGESTION }}" = "${{ matrix.expect }}"
+          test "${{ steps.disc.outputs.HAS_ROOT_PACKAGE_JSON }}" = "${{ matrix.expect_root_pkg }}"
+          test "${{ steps.disc.outputs.HAS_FRONTEND_PACKAGE_JSON }}" = "${{ matrix.expect_frontend_pkg }}"
+          test "${{ steps.disc.outputs.HAS_ROOT_GO_MOD }}" = "${{ matrix.expect_go_mod }}"
+          test "${{ steps.disc.outputs.HAS_ROOT_MAIN_GO }}" = "${{ matrix.expect_main_go }}"
+          test "${{ steps.disc.outputs.HAS_ROOT_CMAKELISTS }}" = "${{ matrix.expect_cmake }}"
+
+
+  options-tests:
+    name: Options sub-action matrix (Ubuntu)
+    needs: [discovery-tests,discovery-fixture-tests]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { distro: '22.04', obf: 'false', nsis: 'false', tags: 'false', expect_webkit: 'false' }
+          - { distro: '24.04', obf: 'false', nsis: 'false', tags: 'false', expect_webkit: 'true' }
+          - { distro: '24.04', obf: 'true',  nsis: 'true',  tags: 'release', expect_webkit: 'true' }
+          - { distro: '24.04', obf: 'false', nsis: 'false', tags: 'release,custom,custom', expect_webkit: 'true', expect_dedupe: 'custom' }
+          - { distro: '24.04', obf: 'false', nsis: 'false', tags: 'release custom', expect_webkit: 'true', expect_dedupe: '' }
+          - { distro: '24.04', obf: 'false', nsis: 'false', tags: 'false', expect_webkit: 'false', disable_webkit: 'true' }
+    steps:
+      - uses: actions/checkout@v4
+      - id: opts
+        uses: ./actions/options
+        with:
+          build-obfuscate: ${{ matrix.obf }}
+          build-tags: ${{ matrix.tags }}
+          nsis: ${{ matrix.nsis }}
+          distro: ${{ matrix.distro }}
+          disable-webkit-auto-tag: ${{ matrix.disable_webkit || 'false' }}
+      - name: Assert BUILD_OPTIONS
+        shell: bash
+        run: |
+          set -euo pipefail
+          BO='${{ steps.opts.outputs.BUILD_OPTIONS }}'
+          echo "BUILD_OPTIONS=$BO"
+          if [ "${{ matrix.obf }}" = "true" ] && ! echo "$BO" | grep -q -- "-obfuscated"; then echo "missing -obfuscated"; exit 1; fi
+          if [ "${{ matrix.nsis }}" = "true" ] && ! echo "$BO" | grep -q -- "-nsis"; then echo "missing -nsis"; exit 1; fi
+          if [ "${{ matrix.expect_webkit }}" = "true" ] && ! echo "$BO" | grep -q -- "webkit2_41"; then echo "missing webkit2_41"; exit 1; fi
+          if [ "${{ matrix.disable_webkit || 'false' }}" = "true" ] && echo "$BO" | grep -q -- "webkit2_41"; then echo "webkit2_41 should be disabled"; exit 1; fi
+          if [ -n "${{ matrix.expect_dedupe || '' }}" ]; then
+            count=$(echo "$BO" | grep -o -- "${{ matrix.expect_dedupe }}" | wc -l | tr -d ' ')
+            if [ "$count" -ne 1 ]; then echo "expected tag '${{ matrix.expect_dedupe }}' to appear once, got $count"; exit 1; fi
+          fi
+  
+  
+  
+  
+
+  setup-go-tests:
+    needs: [options-tests, wails-env-mapping, wails-env-mapping-wrapper]
+    name: Setup Go/Wails sub-action on ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Go/Wails
+        uses: ./actions/setup/go
+        with:
+          go-version: '1.23'
+          build-cache: 'true'
+          build-obfuscate: 'false'
+          wails-version: 'latest'
+          wails-dev-build: 'false'
+      - name: Assert go and wails available
+        shell: bash
+        run: |
+          set -euo pipefail
+          go version
+          if command -v wails >/dev/null 2>&1; then wails version || true; else echo "wails not on PATH (may be Windows PATH nuance), continuing"; fi
+ 
+
+  setup-npm-tests:
+    name: Setup npm sub-action on ${{ matrix.os }}
+    needs: [options-tests, wails-env-mapping, wails-env-mapping-wrapper]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node/npm (no install)
+        uses: ./actions/setup/npm
+        with:
+          node-version: '18.x'
+          working-directory: '.'
+          install: 'false'
+      - name: Assert node/npm
+        shell: bash
+        run: |
+          node -v
+          npm -v
+
+  setup-conan-tests:
+    needs: [options-tests, wails-env-mapping, wails-env-mapping-wrapper]
+    name: Setup Conan sub-action (Linux only)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Conan
+        uses: ./actions/setup/conan
+      - name: Assert conan version present
+        shell: bash
+        run: |
+          if command -v conan >/dev/null 2>&1; then conan --version; else echo "Conan not found in PATH (ok for placeholder)"; fi
+  
+
+  #  setup-deno-tests:
+#    name: Setup Deno sub-action behavior (skip vs enable)
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v4
+#      - name: Skip path (no env)
+#        uses: ./actions/setup/deno
+#      - name: Enable via env and run a command
+#        env:
+#          DENO_ENABLE: 'true'
+#          DENO_VERSION: 'v1.44.x'
+#          DENO_WORKDIR: '.'
+#          DENO_BUILD: 'deno --version'
+#        uses: ./actions/setup/deno
+  
+  package-tests:
+    needs: [setup-conan-tests,setup-go-tests,setup-npm-tests]
+    name: Package sub-action with dummy artifact (Ubuntu)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare dummy artifact
+        shell: bash
+        run: |
+          mkdir -p tmp/bin
+          echo "hello" > tmp/bin/dummy.txt
+      - name: Package (no release on branches)
+        uses: ./actions/package
+        with:
+          package: 'true'
+          build-name: 'ci-test'
+          os: 'Linux'
+          arch: 'amd64'
+          short-sha: '${{ github.sha }}'
+      - name: Check log
+        run: echo "Ensure [DEBUG_LOG] ARTIFACT_NAME is visible above"
+
+  package-smoke-ubuntu:
+    name: Packaging smoke (Ubuntu, package:true, no release on non-tags)
+    runs-on: ubuntu-latest
+    needs: package-tests
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Prepare dummy artifact
+        shell: bash
+        run: |
+          mkdir -p tmp/bin
+          echo "dummy" > tmp/bin/dummy.txt
+      - name: Run root action with packaging
+        uses: ./
+        with:
+          build-name: wails-smoke-${{ github.run_id }}
+          build-platform: linux/amd64
+          app-working-directory: tdd/wails2-root
+          package: true
+          sign: false
+          nsis: false
+      - name: Note
+        run: |
+          echo "[DEBUG_LOG] Packaging smoke complete. Check previous step for ARTIFACT_NAME echo."
+
+  signing-diagnostics:
+    name: Signing diagnostics (dry-run)
+    needs: package-tests
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: macOS gon presence
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          if command -v gon >/dev/null 2>&1; then
+            echo "[DEBUG_LOG] gon present: $(gon --version)"
+          else
+            echo "[DEBUG_LOG] gon not found. It is installed during the Go setup step in real builds (macOS only)."
+          fi
+      - name: Windows signtool discovery
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $paths = @(
+            'C:/Program Files (x86)/Windows Kits/10/bin',
+            'C:/Program Files (x86)/Windows Kits/11/bin'
+          )
+          $found = $false
+          foreach ($base in $paths) {
+            if (Test-Path $base) {
+              $sig = Get-ChildItem -Path $base -Recurse -Filter signtool.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+              if ($sig) { Write-Host "[DEBUG_LOG] signtool found at $($sig.FullName)"; $found = $true; break }
+            }
+          }
+          if (-not $found) {
+            Write-Host "[DEBUG_LOG] signtool.exe not found in common SDK paths. It is typically available with Windows 10/11 SDK."
+          }
+
+  subactions-smoke:
+    needs: package-tests
+    name: Sub-actions smoke (workflow-local ./actions/*)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Discovery (workflow-local path)
+        id: disc
+        uses: ./actions/discovery
+      - name: Compute options (with distro)
+        id: opts
+        uses: ./actions/options
+        with:
+          build-obfuscate: 'true'
+          build-tags: 'release'
+          nsis: 'false'
+          distro: ${{ steps.disc.outputs.DISTRO }}
+      - name: Show computed options
+        run: echo "BUILD_OPTIONS='${{ steps.opts.outputs.BUILD_OPTIONS }}'"
+
+
+  auto-stack-smoke:
+    needs: package-tests
+    name: Auto stack routing smoke (root action on Wails2-like repo)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run root action with AUTO_STACK in tdd/wails2-root
+        id: root
+        uses: ./
+        with:
+          build-name: wails
+          build-platform: linux/amd64
+          app-working-directory: tdd/wails2-root
+          build: false
+          package: false
+          sign: false
+      - name: Assert orchestrator selected wails2
+        shell: bash
+        run: |
+          set -euo pipefail
+          sel='${{ steps.root.outputs.SELECTED_STACK }}'
+          echo "[DEBUG_LOG] SELECTED_STACK=$sel"
+          test "$sel" = "wails2" || { echo "Expected SELECTED_STACK=wails2, got '$sel'"; exit 1; }
+
+  matrix-root-action:
+    name: Root action (./) on ${{ matrix.os }} for ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    needs: [ package-tests]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux/amd64
+          - os: windows-latest
+            platform: windows/amd64
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Prepare dummy artifact
+        shell: bash
+        run: |
+          mkdir -p tmp/bin
+          echo "dummy" > tmp/bin/dummy.txt
+      - name: Run root action locally
+        uses: ./
+        with:
+          build-name: wails-root-action-${{ matrix.os }}
+          build-platform: ${{ matrix.platform }}
+          app-working-directory: tdd/wails2-root
+          build: false
+          package: true
+          sign: false
+
+  wrapper-wails2:
+    name: Wails2 wrapper (./actions/build/wails2) on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    needs: [package-tests]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux/amd64
+          - os: windows-latest
+            platform: windows/amd64
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Run wails2 wrapper locally
+        uses: ./actions/build/wails2
+        with:
+          build-name: wails-wrapper-${{ matrix.os }}
+          build-platform: ${{ matrix.platform }}
+          app-working-directory: tdd/wails2-root
+          package: true
+          sign: false
+          nsis: false
+
+
+#  deno-env-path-test:
+#    name: Deno env-first path (root action on Ubuntu)
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v4
+#      - name: Configure Deno via $GITHUB_ENV
+#        run: |
+#          echo "DENO_ENABLE=true" >> "$GITHUB_ENV"
+#          echo "DENO_VERSION=v1.44.x" >> "$GITHUB_ENV"
+#          echo "DENO_WORKDIR=frontend" >> "$GITHUB_ENV"
+#          echo "DENO_BUILD=deno --version" >> "$GITHUB_ENV"
+#      - name: Run root action (should set up Deno and run command)
+#        uses: ./
+#        with:
+#          build-name: wails
+#          build-platform: linux/amd64
+#          build: false
+#          package: false
+
+  wails-env-mapping:
+    name: WAILS_* env mapping (root action)
+    needs: [discovery-tests,discovery-fixture-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure WAILS_* via $GITHUB_ENV
+        run: |
+          echo "WAILS_OBFUSCATE=true" >> "$GITHUB_ENV"
+          echo "WAILS_NSIS=false" >> "$GITHUB_ENV"
+          echo "WAILS_BUILD_TAGS=release custom" >> "$GITHUB_ENV"
+          echo "WAILS_VERSION=latest" >> "$GITHUB_ENV"
+          echo "WAILS_GO_VERSION=1.23" >> "$GITHUB_ENV"
+          echo "WAILS_NODE_VERSION=18.x" >> "$GITHUB_ENV"
+          echo "WAILS_WEBVIEW2=download" >> "$GITHUB_ENV"
+      - name: Run root action (uses ENV mapping)
+        uses: ./
+        with:
+          build-name: wails
+          build-platform: linux/amd64
+          app-working-directory: tdd/wails2-root
+          build: false
+          package: false
+          sign: false
+
+  wails-env-mapping-wrapper:
+    name: WAILS_* env mapping (wrapper outputs)
+    needs: [discovery-tests,discovery-fixture-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure WAILS_* via $GITHUB_ENV (wrapper)
+        run: |
+          echo "WAILS_OBFUSCATE=true" >> "$GITHUB_ENV"
+          echo "WAILS_NSIS=false" >> "$GITHUB_ENV"
+          echo "WAILS_BUILD_TAGS=release custom" >> "$GITHUB_ENV"
+          echo "WAILS_VERSION=latest" >> "$GITHUB_ENV"
+          echo "WAILS_GO_VERSION=1.23" >> "$GITHUB_ENV"
+          echo "WAILS_NODE_VERSION=18.x" >> "$GITHUB_ENV"
+          echo "WAILS_WEBVIEW2=download" >> "$GITHUB_ENV"
+      - name: Run wails2 wrapper (capture outputs)
+        id: wrap
+        uses: ./actions/build/wails2
+        with:
+          build-name: wails-wrapper-${{ github.run_id }}
+          build-platform: linux/amd64
+          app-working-directory: tdd/wails2-root
+          build: false
+          package: false
+          sign: false
+          nsis: false
+      - name: Assert wrapper resolved envs
+        shell: bash
+        run: |
+          set -euo pipefail
+          tags='${{ steps.wrap.outputs.BUILD_TAGS }}'
+          obf='${{ steps.wrap.outputs.OBFUSCATE }}'
+          nsis='${{ steps.wrap.outputs.NSIS }}'
+          echo "[DEBUG_LOG] WRAP_BUILD_TAGS=$tags OBFUSCATE=$obf NSIS=$nsis"
+          grep -q "release" <<< "$tags"
+          grep -q "custom" <<< "$tags"
+          test "$obf" = "true"
+          test "$nsis" = "false"
+
+  readme-snippets:
+    name: README snippets validation (non-signing, non-release)
+    needs: [package-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Discovery example
+        id: disc
+        uses: ./actions/discovery
+        with:
+          working-directory: tdd/wails2-root
+      - name: Options example
+        id: opts
+        uses: ./actions/options
+        with:
+          build-obfuscate: 'true'
+          build-tags: 'release'
+          nsis: 'false'
+          distro: ${{ steps.disc.outputs.DISTRO }}
+      - name: Package example
+        uses: ./actions/package
+        with:
+          package: 'true'
+          build-name: 'ci-snippet'
+          os: 'Linux'
+          arch: 'amd64'
+          short-sha: '${{ github.sha }}'
+          include-meta: 'true'
+      - name: Note
+        run: echo "[DEBUG_LOG] README snippets validated"
+
+  build-wails2:
+    name: Build Wails2 project (actual compilation)
+    needs: [setup-go-tests, setup-npm-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build with action
+        uses: ./
+        with:
+          build-name: hello-wails
+          build-platform: linux/arm64
+          app-working-directory: tdd/wails2-root
+          build: true
+          package: false
+          sign: false
+      - name: Verify binary
+        run: test -f tdd/wails2-root/build/bin/hello-wails

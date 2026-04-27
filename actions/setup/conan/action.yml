@@ -1,0 +1,25 @@
+name: "Setup Conan (placeholder)"
+description: "Installs Conan package manager for C/C++ projects (future use)"
+inputs:
+  version:
+    required: false
+    default: "latest"
+runs:
+  using: "composite"
+  steps:
+    - name: Install Python (for pip)
+      if: runner.os == 'Windows'
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+    - name: Install Conan via pip
+      shell: bash
+      run: |
+        set -euo pipefail
+        if command -v pip3 >/dev/null 2>&1; then PIP=pip3; elif command -v pip >/dev/null 2>&1; then PIP=pip; else echo "pip not found" && exit 1; fi
+        if [ "${{ inputs.version }}" = "latest" ]; then
+          $PIP install --user conan
+        else
+          $PIP install --user conan=="${{ inputs.version }}"
+        fi
+        echo "Conan installed. Add ~/.local/bin to PATH if needed."

@@ -1,0 +1,13 @@
+# CodeRabbit Configuration
+# Inherits from: https://github.com/host-uk/coderabbit/.coderabbit.yaml
+
+reviews:
+  review_status: false
+  
+  path_instructions:
+    - path: "cmd/**"
+      instructions: "CLI command code - check for proper cobra usage and flag handling"
+    - path: "pkg/**"
+      instructions: "Library code - ensure good API design and documentation"
+    - path: "internal/**"
+      instructions: "Internal packages - check for proper encapsulation"

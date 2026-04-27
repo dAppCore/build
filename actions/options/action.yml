@@ -1,0 +1,72 @@
+name: "Options"
+description: "Compute BUILD_OPTIONS string for builds based on inputs and discovery outputs"
+inputs:
+  build-obfuscate:
+    description: "Obfuscate the build"
+    required: false
+    default: "false"
+  build-tags:
+    description: "Build tags to pass to Go compiler. Space and/or comma separated."
+    required: false
+    default: "false"
+  nsis:
+    description: "Include -nsis flag"
+    required: false
+    default: "false"
+  distro:
+    description: "Linux distro version (e.g., 24.04). Optional; if 24.04 and no explicit webkit tag provided, add webkit2_41"
+    required: false
+    default: ""
+  disable-webkit-auto-tag:
+    description: "When true, do not auto-append webkit2_41 for Ubuntu 24.04"
+    required: false
+    default: "false"
+outputs:
+  BUILD_OPTIONS:
+    description: "Computed build options"
+    value: ${{ steps.compute.outputs.BUILD_OPTIONS }}
+runs:
+  using: "composite"
+  steps:
+    - id: compute
+      name: Compute build options
+      shell: bash
+      env:
+        DISTRO: ${{ inputs.distro }}
+        DISABLE_WEBKIT: ${{ inputs.disable-webkit-auto-tag }}
+      run: |
+        set -euo pipefail
+        build_options=""
+        # Obfuscation
+        if ${{ inputs.build-obfuscate == 'true' }}; then
+          build_options+=" -obfuscated"
+        fi
+        # Normalize tags: accept commas and/or spaces, trim, de-duplicate
+        norm_tags=""
+        if [[ "${{ inputs.build-tags }}" != "false" ]]; then
+          raw="${{ inputs.build-tags }}"
+          raw="${raw//,/ }"
+          # collapse multiple spaces
+          raw=$(echo "$raw" | tr -s ' ')
+          # deduplicate tags (bash 3.x compatible - no associative arrays)
+          for t in $raw; do
+            if [[ -n "$t" ]] && [[ " $norm_tags " != *" $t "* ]]; then
+              norm_tags+=" $t"
+            fi
+          done
+        fi
+        # Ubuntu 24.04 webkit auto-tag unless disabled or already present
+        if [[ "$DISTRO" == '24.04' && "${DISABLE_WEBKIT}" != 'true' ]]; then
+          case " $norm_tags " in
+            *" webkit2_41 "*) : ;; # already present
+            *) norm_tags+=" webkit2_41" ;;
+          esac
+        fi
+        if [[ -n "$norm_tags" ]]; then
+          build_options+=" -tags${norm_tags}"
+        fi
+        # NSIS
+        if ${{ inputs.nsis == 'true' }}; then
+          build_options+=" -nsis"
+        fi
+        echo "BUILD_OPTIONS=$build_options" >> "$GITHUB_OUTPUT"

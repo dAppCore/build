@@ -1,0 +1,69 @@
+name: "Setup toolchains"
+description: "Orchestrates language/tool setup by delegating to sub-actions: setup/go, setup/npm, setup/deno, setup/conan"
+inputs:
+  # Go/Wails
+  go-version:
+    required: false
+    default: "1.23"
+  build-cache:
+    required: false
+    default: "true"
+  build-obfuscate:
+    required: false
+    default: "false"
+  wails-version:
+    required: false
+    default: "latest"
+  wails-dev-build:
+    required: false
+    default: "false"
+  # Node/npm
+  node-version:
+    required: false
+    default: "18.x"
+  npm-working-directory:
+    required: false
+    default: "."
+  npm-install:
+    required: false
+    default: "true"
+  # Deno
+  deno-build:
+    required: false
+    default: ""
+  deno-version:
+    required: false
+    default: "v1.20.x"
+  deno-working-directory:
+    required: false
+    default: "."
+  # Conan (placeholder)
+  conan-enable:
+    required: false
+    default: "false"
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Go
+      uses: host-uk/build/actions/setup/go@dev
+      with:
+        go-version: ${{ inputs.go-version }}
+        build-cache: ${{ inputs.build-cache }}
+        build-obfuscate: ${{ inputs.build-obfuscate }}
+        wails-version: ${{ inputs.wails-version }}
+        wails-dev-build: ${{ inputs.wails-dev-build }}
+    - name: Setup Node/npm
+      uses: host-uk/build/actions/setup/npm@dev
+      with:
+        node-version: ${{ inputs.node-version }}
+        working-directory: ${{ inputs.npm-working-directory }}
+        install: ${{ inputs.npm-install }}
+    - name: Setup Deno (optional)
+      uses: host-uk/build/actions/setup/deno@dev
+      with:
+        deno-build: ${{ inputs.deno-build }}
+        deno-version: ${{ inputs.deno-version }}
+        deno-working-directory: ${{ inputs.deno-working-directory }}
+    - name: Setup Conan (optional)
+      if: inputs.conan-enable == 'true'
+      uses: host-uk/build/actions/setup/conan@dev

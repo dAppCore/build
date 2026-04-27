@@ -1,0 +1,120 @@
+name: Reusable Wails Build
+
+on:
+  workflow_call:
+    inputs:
+      build:
+        type: string
+        default: 'true'
+      sign:
+        type: string
+        default: 'false'
+      package:
+        type: string
+        default: 'true'
+      nsis:
+        type: string
+        default: 'false'
+      build-name:
+        type: string
+        required: true
+      build-cache:
+        type: string
+        default: 'true'
+      build-platform:
+        type: string
+        default: 'darwin/universal'
+      build-tags:
+        type: string
+        default: 'false'
+      build-obfuscate:
+        type: string
+        default: 'false'
+      wails-version:
+        type: string
+        default: 'latest'
+      wails-build-webview2:
+        type: string
+        default: 'download'
+      go-version:
+        type: string
+        default: '1.23'
+      deno-build:
+        type: string
+        default: ''
+      app-working-directory:
+        type: string
+        default: '.'
+      deno-working-directory:
+        type: string
+        default: '.'
+      deno-version:
+        type: string
+        default: 'v1.20.x'
+      sign-macos-app-id:
+        type: string
+        default: ''
+      sign-macos-apple-password:
+        type: string
+        default: ''
+      sign-macos-app-cert:
+        type: string
+        default: ''
+      sign-macos-app-cert-password:
+        type: string
+        default: ''
+      sign-macos-installer-id:
+        type: string
+        default: ''
+      sign-macos-installer-cert:
+        type: string
+        default: ''
+      sign-macos-installer-cert-password:
+        type: string
+        default: ''
+      sign-windows-cert:
+        type: string
+        default: ''
+      sign-windows-cert-password:
+        type: string
+        default: ''
+      wails-dev-build:
+        type: string
+        default: 'false'
+
+jobs:
+  build:
+    runs-on: ${{ inputs.build-platform == 'windows/amd64' && 'windows-latest' || inputs.build-platform == 'linux/amd64' && 'ubuntu-latest' || 'macos-latest' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Wails build action (wrapper)
+        uses: ./actions/build/wails2
+        with:
+          build: ${{ inputs.build }}
+          sign: ${{ inputs.sign }}
+          package: ${{ inputs.package }}
+          nsis: ${{ inputs.nsis }}
+          build-name: ${{ inputs.build-name }}
+          build-cache: ${{ inputs.build-cache }}
+          build-platform: ${{ inputs.build-platform }}
+          build-tags: ${{ inputs.build-tags }}
+          build-obfuscate: ${{ inputs.build-obfuscate }}
+          wails-version: ${{ inputs.wails-version }}
+          wails-build-webview2: ${{ inputs.wails-build-webview2 }}
+          go-version: ${{ inputs.go-version }}
+          deno-build: ${{ inputs.deno-build }}
+          app-working-directory: ${{ inputs.app-working-directory }}
+          deno-working-directory: ${{ inputs.deno-working-directory }}
+          deno-version: ${{ inputs.deno-version }}
+          sign-macos-app-id: ${{ inputs.sign-macos-app-id }}
+          sign-macos-apple-password: ${{ inputs.sign-macos-apple-password }}
+          sign-macos-app-cert: ${{ inputs.sign-macos-app-cert }}
+          sign-macos-app-cert-password: ${{ inputs.sign-macos-app-cert-password }}
+          sign-macos-installer-id: ${{ inputs.sign-macos-installer-id }}
+          sign-macos-installer-cert: ${{ inputs.sign-macos-installer-cert }}
+          sign-macos-installer-cert-password: ${{ inputs.sign-macos-installer-cert-password }}
+          sign-windows-cert: ${{ inputs.sign-windows-cert }}
+          sign-windows-cert-password: ${{ inputs.sign-windows-cert-password }}
+          wails-dev-build: ${{ inputs.wails-dev-build }}

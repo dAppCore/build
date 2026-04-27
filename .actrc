@@ -1,0 +1,13 @@
+# Default to large Ubuntu image for full compatibility (Go, Node, GTK/WebKit)
+-P ubuntu-latest=catthehacker/ubuntu:full-latest
+-P ubuntu-22.04=catthehacker/ubuntu:full-22.04
+-P ubuntu-24.04=catthehacker/ubuntu:full-24.04
+
+# macOS can't be emulated - skip or use self-hosted
+-P macos-latest=-self-hosted
+
+# Windows can't be emulated - skip or use self-hosted
+-P windows-latest=-self-hosted
+
+# Use ARM64 architecture (M3 native)
+--container-architecture linux/arm64

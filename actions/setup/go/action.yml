@@ -1,0 +1,43 @@
+name: "Setup Go (and Wails)"
+description: "Sets up Go (with optional cache), installs Garble when obfuscating, installs Wails CLI unless wails-dev-build is true; installs gon on macOS"
+inputs:
+  go-version:
+    required: false
+    default: "1.23"
+  build-cache:
+    required: false
+    default: "true"
+  build-obfuscate:
+    required: false
+    default: "false"
+  wails-version:
+    required: false
+    default: "latest"
+  wails-dev-build:
+    required: false
+    default: "false"
+runs:
+  using: "composite"
+  steps:
+    - name: Setup GoLang
+      uses: actions/setup-go@v5
+      if: inputs.wails-dev-build == 'false'
+      with:
+        check-latest: true
+        cache: ${{ inputs.build-cache }}
+        cache-dependency-path: 'go.sum'
+        go-version: ${{ inputs.go-version }}
+    - name: Install Garble
+      if: inputs.build-obfuscate == 'true'
+      run: go install mvdan.cc/garble@latest
+      shell: bash
+    - run: go version
+      shell: bash
+    - name: Install Wails
+      if: inputs.wails-dev-build == 'false'
+      run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ inputs.wails-version }}
+      shell: bash
+    - name: Install macOS deps (gon)
+      if: runner.os == 'macOS'
+      run: brew install mitchellh/gon/gon
+      shell: bash

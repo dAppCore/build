@@ -1,0 +1,126 @@
+name: "Core Go (library pipeline)"
+description: "Build and test Go library packages from the Core ecosystem. No binary output — validates code quality, runs tests, checks conventions."
+inputs:
+  go-version:
+    description: "Go version"
+    required: false
+    default: "1.26"
+  run-vet:
+    description: "Run go vet"
+    required: false
+    default: "true"
+  run-lint:
+    description: "Run golangci-lint"
+    required: false
+    default: "false"
+  run-vuln:
+    description: "Run govulncheck"
+    required: false
+    default: "false"
+  run-race:
+    description: "Run tests with -race"
+    required: false
+    default: "false"
+  coverage-threshold:
+    description: "Minimum coverage percentage (0 to skip)"
+    required: false
+    default: "0"
+outputs:
+  TESTS_PASSED:
+    description: "1 if all tests passed"
+    value: ${{ steps.test.outputs.PASSED }}
+  COVERAGE:
+    description: "Test coverage percentage"
+    value: ${{ steps.test.outputs.COVERAGE }}
+  VET_PASSED:
+    description: "1 if go vet passed"
+    value: ${{ steps.vet.outputs.PASSED }}
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ inputs.go-version }}
+
+    - name: Download dependencies
+      shell: bash
+      run: |
+        GOWORK=off go mod download
+        echo "[core] Dependencies downloaded"
+
+    - name: Build
+      shell: bash
+      run: |
+        GOWORK=off go build ./...
+        echo "[core] Build passed"
+
+    - name: Vet
+      id: vet
+      if: inputs.run-vet == 'true'
+      shell: bash
+      run: |
+        if GOWORK=off go vet ./... 2>&1; then
+          echo "PASSED=1" >> "$GITHUB_OUTPUT"
+          echo "[core] Vet passed"
+        else
+          echo "PASSED=0" >> "$GITHUB_OUTPUT"
+          echo "[core] Vet found issues"
+          exit 1
+        fi
+
+    - name: Test
+      id: test
+      shell: bash
+      run: |
+        RACE_FLAG=""
+        if [ "${{ inputs.run-race }}" = "true" ]; then
+          RACE_FLAG="-race"
+        fi
+
+        # Run tests with coverage
+        GOWORK=off go test ./... -count=1 -timeout 120s $RACE_FLAG -coverprofile=coverage.out 2>&1
+        TEST_EXIT=$?
+
+        if [ $TEST_EXIT -eq 0 ]; then
+          echo "PASSED=1" >> "$GITHUB_OUTPUT"
+          echo "[core] Tests passed"
+        else
+          echo "PASSED=0" >> "$GITHUB_OUTPUT"
+          echo "[core] Tests failed"
+        fi
+
+        # Extract coverage
+        if [ -f coverage.out ]; then
+          COV=$(GOWORK=off go tool cover -func=coverage.out | tail -1 | awk '{print $NF}' | tr -d '%')
+          echo "COVERAGE=$COV" >> "$GITHUB_OUTPUT"
+          echo "[core] Coverage: ${COV}%"
+
+          # Check threshold
+          THRESHOLD="${{ inputs.coverage-threshold }}"
+          if [ "$THRESHOLD" != "0" ] && [ -n "$COV" ]; then
+            if [ "$(echo "$COV < $THRESHOLD" | bc -l)" = "1" ]; then
+              echo "[core] Coverage ${COV}% below threshold ${THRESHOLD}%"
+              exit 1
+            fi
+          fi
+        fi
+
+        exit $TEST_EXIT
+
+    - name: Lint
+      if: inputs.run-lint == 'true'
+      shell: bash
+      run: |
+        if command -v golangci-lint >/dev/null 2>&1; then
+          golangci-lint run ./...
+        else
+          echo "[core] golangci-lint not installed, skipping"
+        fi
+
+    - name: Vulnerability check
+      if: inputs.run-vuln == 'true'
+      shell: bash
+      run: |
+        go install golang.org/x/vuln/cmd/govulncheck@latest
+        GOWORK=off govulncheck ./...

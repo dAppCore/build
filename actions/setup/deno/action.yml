@@ -1,0 +1,52 @@
+name: "Setup Deno (ENV-first)"
+description: "Sets up Deno and optionally runs a Deno command; configuration comes from env first, then inputs"
+inputs:
+  deno-build:
+    required: false
+    default: ""
+  deno-version:
+    required: false
+    default: "v1.20.x"
+  deno-working-directory:
+    required: false
+    default: "."
+runs:
+  using: "composite"
+  steps:
+    - name: Resolve Deno configuration
+      id: deno_cfg
+      shell: bash
+      env:
+        INPUT_DENO_BUILD: ${{ inputs.deno-build }}
+        INPUT_DENO_VERSION: ${{ inputs.deno-version }}
+        INPUT_DENO_WORKDIR: ${{ inputs.deno-working-directory }}
+      run: |
+        set -euo pipefail
+        deno_enable="${DENO_ENABLE:-}"
+        deno_build="${DENO_BUILD:-}"
+        deno_version="${DENO_VERSION:-}"
+        deno_workdir="${DENO_WORKDIR:-}"
+        # Fallback to inputs if env not set
+        if [ -z "$deno_build" ]; then deno_build="$INPUT_DENO_BUILD"; fi
+        if [ -z "$deno_version" ]; then deno_version="$INPUT_DENO_VERSION"; fi
+        if [ -z "$deno_workdir" ]; then deno_workdir="$INPUT_DENO_WORKDIR"; fi
+        enabled=0
+        deno_enable_lc=$(echo "$deno_enable" | tr '[:upper:]' '[:lower:]')
+        case "$deno_enable_lc" in
+          true|1|yes|on) enabled=1;;
+        esac
+        if [ -n "$deno_build" ]; then enabled=1; fi
+        echo "ENABLED=$enabled" >> "$GITHUB_OUTPUT"
+        echo "BUILD=$deno_build" >> "$GITHUB_OUTPUT"
+        echo "VERSION=$deno_version" >> "$GITHUB_OUTPUT"
+        echo "WORKDIR=${deno_workdir:-.}" >> "$GITHUB_OUTPUT"
+    - name: Setup Deno
+      uses: denoland/setup-deno@v2
+      if: steps.deno_cfg.outputs.ENABLED == '1'
+      with:
+        deno-version: ${{ steps.deno_cfg.outputs.VERSION }}
+    - name: Run Deno Command
+      if: steps.deno_cfg.outputs.BUILD != ''
+      shell: bash
+      working-directory: ${{ steps.deno_cfg.outputs.WORKDIR }}
+      run: ${{ steps.deno_cfg.outputs.BUILD }}

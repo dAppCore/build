@@ -1,0 +1,293 @@
+name: "Wails v2 (full pipeline)"
+description: "Runs the full Wails v2 build pipeline: discovery, options, setup (Go/Deno/Wails), build, sign, and package"
+inputs:
+  build:
+    description: "Whether to run the build"
+    required: false
+    default: "true"
+  sign:
+    description: "Sign the build (macOS/Windows)"
+    required: false
+    default: "false"
+  package:
+    description: "Upload artifacts and release on tag"
+    required: false
+    default: "true"
+  nsis:
+    description: "Build a Windows Installer"
+    required: false
+    default: "false"
+  build-name:
+    description: "The name of the binary/app bundle"
+    required: true
+  build-cache:
+    description: "Enable Go cache"
+    required: false
+    default: "true"
+  build-platform:
+    description: "Platform to build for (e.g., linux/amd64, windows/amd64, darwin/universal)"
+    required: false
+    default: "darwin/universal"
+  build-tags:
+    description: "Build tags to pass to Go compiler. Must be quoted. Space or comma (but not both) separated"
+    required: false
+    default: "false"
+  build-obfuscate:
+    description: "Obfuscate (garble) the build"
+    required: false
+    default: "false"
+  wails-version:
+    description: "Wails version to use"
+    required: false
+    default: "latest"
+  wails-build-webview2:
+    description: "WebView2 installer method [download,embed,browser,error]"
+    required: false
+    default: "download"
+  go-version:
+    description: "Go version"
+    required: false
+    default: "1.23"
+  node-version:
+    description: "Node js version (unused by pipeline but kept for compatibility)"
+    required: false
+    default: "18.x"
+  deno-build:
+    description: "Deno command to run (optional, ENV-first)"
+    required: false
+    default: ""
+  app-working-directory:
+    description: "App working directory"
+    required: false
+    default: "."
+  deno-working-directory:
+    description: "Deno working directory"
+    required: false
+    default: "."
+  deno-version:
+    description: "Deno version"
+    required: false
+    default: "v1.20.x"
+  sign-macos-app-id:
+    required: false
+    default: ''
+    description: ""
+  sign-macos-apple-password:
+    required: false
+    default: ''
+    description: ""
+  sign-macos-app-cert:
+    required: false
+    default: ''
+    description: ""
+  sign-macos-app-cert-password:
+    required: false
+    default: ''
+    description: ""
+  sign-macos-installer-id:
+    required: false
+    default: ''
+    description: ""
+  sign-macos-installer-cert:
+    required: false
+    default: ''
+    description: ""
+  sign-macos-installer-cert-password:
+    required: false
+    default: ''
+    description: ""
+  sign-windows-cert:
+    required: false
+    default: ''
+    description: ""
+  sign-windows-cert-password:
+    required: false
+    default: ''
+    description: ""
+  wails-dev-build:
+    description: "Use provided wails binary instead of installing"
+    required: false
+    default: "false"
+runs:
+  using: "composite"
+  steps:
+    - name: Resolve Wails configuration (inputs > env > defaults)
+      id: wcfg
+      shell: bash
+      env:
+        IN_BUILD_TAGS: ${{ inputs.build-tags }}
+        IN_OBFUSCATE: ${{ inputs.build-obfuscate }}
+        IN_NSIS: ${{ inputs.nsis }}
+        IN_WV2: ${{ inputs.wails-build-webview2 }}
+        IN_WAILS_VER: ${{ inputs.wails-version }}
+        IN_GO_VER: ${{ inputs.go-version }}
+        IN_NODE_VER: ${{ inputs.node-version }}
+        IN_DENO_VER: ${{ inputs.deno-version }}
+        # Env alternatives
+        EV_BUILD_TAGS: ${{ env.WAILS_BUILD_TAGS }}
+        EV_OBFUSCATE: ${{ env.WAILS_OBFUSCATE }}
+        EV_NSIS: ${{ env.WAILS_NSIS }}
+        EV_WV2: ${{ env.WAILS_WEBVIEW2 }}
+        EV_WAILS_VER: ${{ env.WAILS_VERSION }}
+        EV_GO_VER: ${{ env.WAILS_GO_VERSION }}
+        EV_NODE_VER: ${{ env.WAILS_NODE_VERSION }}
+        EV_DENO_VER: ${{ env.WAILS_DENO_VERSION }}
+        # Signing envs
+        EV_MAC_PW: ${{ env.SIGN_MACOS_APPLE_PASSWORD }}
+        EV_MAC_ID: ${{ env.SIGN_MACOS_APP_ID }}
+        EV_MAC_CERT: ${{ env.SIGN_MACOS_APP_CERT }}
+        EV_MAC_CERT_PW: ${{ env.SIGN_MACOS_APP_CERT_PASSWORD }}
+        EV_MAC_INS_ID: ${{ env.SIGN_MACOS_INSTALLER_ID }}
+        EV_MAC_INS_CERT: ${{ env.SIGN_MACOS_INSTALLER_CERT }}
+        EV_MAC_INS_CERT_PW: ${{ env.SIGN_MACOS_INSTALLER_CERT_PASSWORD }}
+        EV_WIN_CERT: ${{ env.SIGN_WINDOWS_CERT }}
+        EV_WIN_CERT_PW: ${{ env.SIGN_WINDOWS_CERT_PASSWORD }}
+      run: |
+        set -euo pipefail
+        # helper to pick first non-empty
+        pick() { if [ -n "$1" ] && [ "$1" != "false" ]; then echo "$1"; else echo "$2"; fi }
+        # booleans normalize
+        tobool() { local v; v=$(echo "$1" | tr '[:upper:]' '[:lower:]'); case "$v" in true|1|yes|on) echo "true";; *) echo "false";; esac }
+        BUILD_TAGS=$(pick "${IN_BUILD_TAGS:-}" "${EV_BUILD_TAGS:-}")
+        OBFUSCATE=$(tobool "$(pick "${IN_OBFUSCATE:-}" "${EV_OBFUSCATE:-}")")
+        NSIS=$(tobool "$(pick "${IN_NSIS:-}" "${EV_NSIS:-}")")
+        WV2=$(pick "${IN_WV2:-}" "${EV_WV2:-}")
+        WAILS_VER=$(pick "${IN_WAILS_VER:-}" "${EV_WAILS_VER:-}")
+        GO_VER=$(pick "${IN_GO_VER:-}" "${EV_GO_VER:-}")
+        NODE_VER=$(pick "${IN_NODE_VER:-}" "${EV_NODE_VER:-}")
+        DENO_VER=$(pick "${IN_DENO_VER:-}" "${EV_DENO_VER:-}")
+        # Signing
+        MAC_PW="${EV_MAC_PW:-}"; MAC_ID="${EV_MAC_ID:-}"; MAC_CERT="${EV_MAC_CERT:-}"; MAC_CERT_PW="${EV_MAC_CERT_PW:-}"
+        MAC_INS_ID="${EV_MAC_INS_ID:-}"; MAC_INS_CERT="${EV_MAC_INS_CERT:-}"; MAC_INS_CERT_PW="${EV_MAC_INS_CERT_PW:-}"
+        WIN_CERT="${EV_WIN_CERT:-}"; WIN_CERT_PW="${EV_WIN_CERT_PW:-}"
+        echo "BUILD_TAGS=$BUILD_TAGS" >> "$GITHUB_OUTPUT"
+        echo "OBFUSCATE=$OBFUSCATE" >> "$GITHUB_OUTPUT"
+        echo "NSIS=$NSIS" >> "$GITHUB_OUTPUT"
+        echo "WV2=$WV2" >> "$GITHUB_OUTPUT"
+        echo "WAILS_VER=$WAILS_VER" >> "$GITHUB_OUTPUT"
+        echo "GO_VER=$GO_VER" >> "$GITHUB_OUTPUT"
+        echo "NODE_VER=$NODE_VER" >> "$GITHUB_OUTPUT"
+        echo "DENO_VER=$DENO_VER" >> "$GITHUB_OUTPUT"
+        echo "SIGN_MACOS_APPLE_PASSWORD=$MAC_PW" >> "$GITHUB_OUTPUT"
+        echo "SIGN_MACOS_APP_ID=$MAC_ID" >> "$GITHUB_OUTPUT"
+        echo "SIGN_MACOS_APP_CERT=$MAC_CERT" >> "$GITHUB_OUTPUT"
+        echo "SIGN_MACOS_APP_CERT_PASSWORD=$MAC_CERT_PW" >> "$GITHUB_OUTPUT"
+        echo "SIGN_MACOS_INSTALLER_ID=$MAC_INS_ID" >> "$GITHUB_OUTPUT"
+        echo "SIGN_MACOS_INSTALLER_CERT=$MAC_INS_CERT" >> "$GITHUB_OUTPUT"
+        echo "SIGN_MACOS_INSTALLER_CERT_PASSWORD=$MAC_INS_CERT_PW" >> "$GITHUB_OUTPUT"
+        echo "SIGN_WINDOWS_CERT=$WIN_CERT" >> "$GITHUB_OUTPUT"
+        echo "SIGN_WINDOWS_CERT_PASSWORD=$WIN_CERT_PW" >> "$GITHUB_OUTPUT"
+        echo "[DEBUG_LOG] Wails2 resolve: tags='${BUILD_TAGS:-<default>}' obf=${OBFUSCATE} nsis=${NSIS} wv2='${WV2:-default}' wails='${WAILS_VER:-default}' go='${GO_VER:-default}' node='${NODE_VER:-default}' deno='${DENO_VER:-default}'"
+
+    - name: Discovery
+      id: discovery
+      uses: host-uk/build/actions/discovery@dev
+      with:
+        working-directory: ${{ inputs.app-working-directory }}
+
+    - name: Compute Build Options
+      id: build_options
+      uses: host-uk/build/actions/options@dev
+      with:
+        build-obfuscate: ${{ steps.wcfg.outputs.OBFUSCATE }}
+        build-tags: ${{ steps.wcfg.outputs.BUILD_TAGS }}
+        nsis: ${{ steps.wcfg.outputs.NSIS }}
+        distro: ${{ steps.discovery.outputs.DISTRO }}
+
+    - name: Setup toolchains (Go/Node/Deno/Wails)
+      uses: host-uk/build/actions/setup@dev
+      with:
+        go-version: ${{ steps.wcfg.outputs.GO_VER }}
+        build-cache: ${{ inputs.build-cache }}
+        build-obfuscate: ${{ steps.wcfg.outputs.OBFUSCATE }}
+        wails-version: ${{ steps.wcfg.outputs.WAILS_VER }}
+        wails-dev-build: ${{ inputs.wails-dev-build }}
+        node-version: ${{ steps.wcfg.outputs.NODE_VER }}
+        npm-working-directory: ${{ inputs.app-working-directory }}
+        npm-install: 'true'
+        deno-build: ${{ inputs.deno-build }}
+        deno-version: ${{ steps.wcfg.outputs.DENO_VER }}
+        deno-working-directory: ${{ inputs.deno-working-directory }}
+
+    - name: Wails2 npm extras (env-first)
+      shell: bash
+      run: |
+        set -euo pipefail
+        npm_enable="${NPM_ENABLE:-}"
+        npm_packages="${NPM_PACKAGES:-}"
+        npm_enable_lc=$(echo "$npm_enable" | tr '[:upper:]' '[:lower:]')
+        case "$npm_enable_lc" in
+          true|1|yes|on) enable=1;;
+          *) enable=0;;
+        esac
+        echo "[DEBUG_LOG] Wails2 npm extras: NPM_ENABLE=${npm_enable:-<unset>} NPM_PACKAGES=${npm_packages:-<unset>}"
+        if [ -z "$npm_packages" ] && [ "$enable" -ne 1 ]; then
+          echo "[DEBUG_LOG] NPM extras not enabled (set NPM_ENABLE or NPM_PACKAGES). Skipping."
+          exit 0
+        fi
+        if [ -z "$npm_packages" ]; then
+          echo "[DEBUG_LOG] NPM_ENABLE set but NPM_PACKAGES is empty; nothing to install. Skipping."
+          exit 0
+        fi
+        echo "[DEBUG_LOG] Installing extra npm packages globally: $npm_packages"
+        npm install -g $npm_packages
+
+    - name: Build Wails app
+      uses: host-uk/build/actions/build/wails2/build@dev
+      with:
+        build: ${{ inputs.build }}
+        app-working-directory: ${{ inputs.app-working-directory }}
+        build-platform: ${{ inputs.build-platform }}
+        build-name: ${{ inputs.build-name }}
+        wails-build-webview2: ${{ steps.wcfg.outputs.WV2 }}
+        build-options: ${{ steps.build_options.outputs.BUILD_OPTIONS }}
+
+    - name: Sign artifacts (OS-conditional)
+      uses: host-uk/build/actions/sign@dev
+      with:
+        sign: ${{ inputs.sign }}
+        app-working-directory: ${{ inputs.app-working-directory }}
+        build-name: ${{ inputs.build-name }}
+        sign-macos-apple-password: ${{ steps.wcfg.outputs.SIGN_MACOS_APPLE_PASSWORD }}
+        sign-macos-app-id: ${{ steps.wcfg.outputs.SIGN_MACOS_APP_ID }}
+        sign-macos-app-cert: ${{ steps.wcfg.outputs.SIGN_MACOS_APP_CERT }}
+        sign-macos-app-cert-password: ${{ steps.wcfg.outputs.SIGN_MACOS_APP_CERT_PASSWORD }}
+        sign-macos-installer-id: ${{ steps.wcfg.outputs.SIGN_MACOS_INSTALLER_ID }}
+        sign-macos-installer-cert: ${{ steps.wcfg.outputs.SIGN_MACOS_INSTALLER_CERT }}
+        sign-macos-installer-cert-password: ${{ steps.wcfg.outputs.SIGN_MACOS_INSTALLER_CERT_PASSWORD }}
+        sign-windows-cert: ${{ steps.wcfg.outputs.SIGN_WINDOWS_CERT }}
+        sign-windows-cert-password: ${{ steps.wcfg.outputs.SIGN_WINDOWS_CERT_PASSWORD }}
+
+    - name: Package & release
+      uses: host-uk/build/actions/package@dev
+      with:
+        package: ${{ inputs.package }}
+        build-name: ${{ inputs.build-name }}
+        os: ${{ steps.discovery.outputs.OS }}
+        arch: ${{ steps.discovery.outputs.ARCH }}
+        tag: ${{ steps.discovery.outputs.TAG }}
+        is-tag: ${{ steps.discovery.outputs.IS_TAG }}
+        short-sha: ${{ steps.discovery.outputs.SHORT_SHA }}
+        ref: ${{ steps.discovery.outputs.REF }}
+outputs:
+  BUILD_TAGS:
+    description: "Resolved build tags (after env/input precedence)"
+    value: ${{ steps.wcfg.outputs.BUILD_TAGS }}
+  OBFUSCATE:
+    description: "Resolved obfuscate flag"
+    value: ${{ steps.wcfg.outputs.OBFUSCATE }}
+  NSIS:
+    description: "Resolved nsis flag"
+    value: ${{ steps.wcfg.outputs.NSIS }}
+  WAILS_VERSION:
+    description: "Resolved Wails version"
+    value: ${{ steps.wcfg.outputs.WAILS_VER }}
+  GO_VERSION:
+    description: "Resolved Go version"
+    value: ${{ steps.wcfg.outputs.GO_VER }}
+  NODE_VERSION:
+    description: "Resolved Node version"
+    value: ${{ steps.wcfg.outputs.NODE_VER }}
+  DENO_VERSION:
+    description: "Resolved Deno version"
+    value: ${{ steps.wcfg.outputs.DENO_VER }}
