@@ -15,7 +15,8 @@
 # and add a .graphifyignore to the repo to exclude vendored dirs (e.g. external/),
 # else the graph fills with dependency code.
 graphify:
-  stage: .post            # reserved stage: always exists, runs last, no repo conflict
+  stage: build            # a DEFAULT stage — GitLab won't create a pipeline whose only
+                          # jobs are in .pre/.post, so a regular stage is required
   tags: [homelab]
   interruptible: true
   allow_failure: true     # the graph is auxiliary — never gate a repo's own CI on it
