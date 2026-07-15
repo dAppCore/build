@@ -1,0 +1,34 @@
+# gitlab/graphify.yml — shared graphify code-graph CI job (dappcore/devops/build).
+#
+# Keeps each repo's slice of the fleet knowledge graph fresh on the homelab
+# graphify server (https://graphify.lthn.sh): an AST-only extract (no LLM / no
+# API cost) into the central per-repo store, then a flock-serialised merge into
+# the ONE global graph the server hot-reloads. graphify's own global merge takes
+# no cross-process lock, so the flock here is what makes concurrent repo pushes
+# safe (last-writer-wins / torn-read otherwise).
+#
+# USE — in a repo's .gitlab-ci.yml:
+#   include:
+#     - project: 'dappcore/devops/build'
+#       file: '/gitlab/graphify.yml'
+#       ref: dev
+# and add a .graphifyignore to the repo to exclude vendored dirs (e.g. external/),
+# else the graph fills with dependency code.
+graphify:
+  stage: .post            # reserved stage: always exists, runs last, no repo conflict
+  tags: [homelab]
+  interruptible: true
+  allow_failure: true     # the graph is auxiliary — never gate a repo's own CI on it
+  variables:
+    GIT_SUBMODULE_STRATEGY: none
+    HOME: /srv/graphify   # → global graph at /srv/graphify/.graphify/global-graph.json
+  script:
+    # 1. extract THIS repo's own code — parallel-safe (writes only its per-repo store)
+    - /usr/local/bin/graphify extract "$CI_PROJECT_DIR" --code-only --out "/srv/graphify/graphs/$CI_PROJECT_NAME"
+    # 2. merge into the shared global graph under an flock (serialise cross-repo writes;
+    #    graphify's global add is change-detecting, so an unchanged repo is a no-op)
+    - flock /srv/graphify/.graphify/global.lock /usr/local/bin/graphify global add "/srv/graphify/graphs/$CI_PROJECT_NAME/graphify-out/graph.json" --as "$CI_PROJECT_NAME"
+    - /usr/local/bin/graphify global list
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "dev"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
