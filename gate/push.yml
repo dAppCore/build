@@ -1,0 +1,22 @@
+# gate/push.yml — the PUSH juncture (dappcore/devops/build).
+#
+# Runs on a plain branch push (dev + feature branches): the standard "does it
+# still build" flow, so a branch never rots between merges. Fast feedback only —
+# the thorough lint+test gate is gate/pr.yml, which fires on the merge request.
+#
+# USE — in a repo's .gitlab-ci.yml:
+#   include:
+#     - { project: 'dappcore/devops/build', file: '/gate/push.yml', ref: dev }
+#   build:
+#     extends: .gate-push
+#     script: [ make build ]          # your repo's compile / standard flow
+#
+# Each gate file declares the same `stages:` so any subset composes cleanly.
+stages: [lint, test, build, release]
+
+.gate-push:
+  stage: build
+  tags: [homelab]
+  interruptible: true                 # a newer push auto-cancels an in-flight run
+  rules:
+    - if: '$CI_COMMIT_BRANCH && $CI_PIPELINE_SOURCE == "push"'
