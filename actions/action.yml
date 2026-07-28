@@ -165,7 +165,6 @@ runs:
         app-working-directory: ${{ inputs.app-working-directory }}
         release-asset-prefix: ${{ inputs.release-asset-prefix }}
         go-directory: ${{ inputs.go-directory }}
-        release-asset-prefix: ${{ inputs.release-asset-prefix }}
         main-package: ${{ inputs.main-package }}
         build-tags: ${{ inputs.build-tags }}
         ldflags: ${{ inputs.ldflags }}
@@ -235,9 +234,7 @@ runs:
       uses: dAppCore/build/actions/build/core@v4
       with:
         app-working-directory: ${{ inputs.app-working-directory }}
-        release-asset-prefix: ${{ inputs.release-asset-prefix }}
         go-directory: ${{ inputs.go-directory }}
-        release-asset-prefix: ${{ inputs.release-asset-prefix }}
 outputs:
   SELECTED_STACK:
     description: "Stack selected by the orchestrator"
