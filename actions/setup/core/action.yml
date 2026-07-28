@@ -1,0 +1,170 @@
+name: "Setup core"
+description: >
+  Installs the core CLI onto the runner and puts it on PATH, so every job this
+  action drives has the same build, lint and QA tooling available by name.
+
+  The point is a known environment. core composes dappco.re/go/build and
+  dappco.re/go/lint, so a runner with core on it can build and check any CoreGO
+  project without installing anything further — and an agent sandbox given the
+  same install has the same surface, tested by the same path CI uses.
+
+  Native packaging is preferred where it exists, because a package manager
+  records what it installed and can remove it: apt on Linux today. macOS and
+  Windows fall back to the release archive until a current tap and a Windows
+  manifest are published. The fallback is not a lesser path — it is what the
+  generated installers use, so it gets exercised constantly.
+
+inputs:
+  version:
+    description: "Release tag to install, or `latest`"
+    required: false
+    default: "latest"
+  repository:
+    description: "Repository publishing the core releases"
+    required: false
+    default: "dAppCore/cli"
+  method:
+    description: >
+      `auto` prefers a native package and falls back to the archive.
+      `archive` always takes the zip. `package` fails if no native package
+      applies, rather than quietly installing another way.
+    required: false
+    default: "auto"
+  token:
+    description: "Token for the releases API, to avoid anonymous rate limits"
+    required: false
+    default: ""
+
+outputs:
+  CORE_VERSION:
+    description: "The version that ended up on PATH"
+    value: ${{ steps.install.outputs.CORE_VERSION }}
+  CORE_METHOD:
+    description: "How it was installed: apt or archive"
+    value: ${{ steps.install.outputs.CORE_METHOD }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install core
+      id: install
+      shell: bash
+      env:
+        IN_VERSION: ${{ inputs.version }}
+        IN_REPO: ${{ inputs.repository }}
+        IN_METHOD: ${{ inputs.method }}
+        GH_TOKEN: ${{ inputs.token }}
+      run: |
+        set -euo pipefail
+
+        case "$(uname -s)" in
+          Linux*)   os=linux ;;
+          Darwin*)  os=darwin ;;
+          MINGW*|MSYS*|CYGWIN*) os=windows ;;
+          *) echo "::error::unsupported OS: $(uname -s)"; exit 1 ;;
+        esac
+        case "$(uname -m)" in
+          x86_64|amd64)   arch=amd64 ;;
+          aarch64|arm64)  arch=arm64 ;;
+          *) echo "::error::unsupported architecture: $(uname -m)"; exit 1 ;;
+        esac
+
+        # The tag is needed by name even for `latest`: release assets are named
+        # without a version so /releases/latest/download resolves, but the .deb
+        # carries its version in the filename, and reporting what was installed
+        # requires knowing it either way.
+        version="$IN_VERSION"
+        if [ "$version" = "latest" ]; then
+          api="https://api.github.com/repos/$IN_REPO/releases/latest"
+          if [ -n "${GH_TOKEN:-}" ]; then
+            version="$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" "$api" | grep -m1 '"tag_name"' | cut -d'"' -f4)"
+          else
+            version="$(curl -fsSL "$api" | grep -m1 '"tag_name"' | cut -d'"' -f4)"
+          fi
+        fi
+        if [ -z "$version" ]; then
+          echo "::error::could not resolve a release tag from $IN_REPO"
+          exit 1
+        fi
+
+        base="https://github.com/$IN_REPO/releases/download/$version"
+        method=""
+
+        # ── Native package ───────────────────────────────────────────────────
+        # apt is the one channel published today. dpkg -i would leave a package
+        # unconfigured on a missing dependency; apt resolves instead, and a
+        # local .deb path is a first-class argument to it.
+        if [ "$IN_METHOD" != "archive" ] && [ "$os" = "linux" ] && command -v apt-get >/dev/null 2>&1; then
+          case "$arch" in
+            amd64) deb_arch=amd64 ;;
+            arm64) deb_arch=arm64 ;;
+            *)     deb_arch="" ;;
+          esac
+          if [ -n "$deb_arch" ]; then
+            deb="core_${version#v}_${deb_arch}.deb"
+            if curl -fsSL -o "/tmp/$deb" "$base/$deb" 2>/dev/null; then
+              sudo apt-get install -y "/tmp/$deb"
+              rm -f "/tmp/$deb"
+              method=apt
+            else
+              echo "::notice::no $deb published for $version — falling back to the archive"
+            fi
+          fi
+        fi
+
+        # ── Archive ──────────────────────────────────────────────────────────
+        if [ -z "$method" ]; then
+          if [ "$IN_METHOD" = "package" ]; then
+            echo "::error::no native package for $os/$arch, and method is 'package'"
+            exit 1
+          fi
+
+          archive="core-${os}-${arch}.zip"
+          tmp="$(mktemp -d)"
+          curl -fsSL -o "$tmp/$archive" "$base/$archive"
+
+          # unzip is absent from a Windows runner's Git Bash; PowerShell ships
+          # with the OS and covers it. Both are given a relative path, because
+          # $PWD under Git Bash is /d/a/... and PowerShell reads that as
+          # D:\d\a\..., which does not exist.
+          if command -v unzip >/dev/null 2>&1; then
+            unzip -q -o "$tmp/$archive" -d "$tmp"
+          elif command -v pwsh >/dev/null 2>&1 || command -v powershell >/dev/null 2>&1; then
+            PS_BIN=pwsh
+            command -v pwsh >/dev/null 2>&1 || PS_BIN=powershell
+            ( cd "$tmp" && "$PS_BIN" -NoProfile -Command "Expand-Archive -Path '$archive' -DestinationPath '.' -Force" )
+          else
+            echo "::error::no unzip and no PowerShell available to extract $archive"
+            exit 1
+          fi
+
+          binary="core"
+          [ "$os" = "windows" ] && binary="core.exe"
+          test -f "$tmp/$binary"
+
+          install_dir="$HOME/.local/bin"
+          mkdir -p "$install_dir"
+          # install(1) sets the mode in one step; Windows has no cp -p semantics
+          # worth relying on, so chmod follows the copy there.
+          if [ "$os" = "windows" ]; then
+            cp "$tmp/$binary" "$install_dir/$binary"
+          else
+            install -m 0755 "$tmp/$binary" "$install_dir/$binary"
+          fi
+          echo "$install_dir" >> "$GITHUB_PATH"
+          export PATH="$install_dir:$PATH"
+          rm -rf "$tmp"
+          method=archive
+        fi
+
+        # Asserted, not assumed: an install that put a file somewhere PATH does
+        # not reach is the failure this step exists to prevent.
+        if ! command -v core >/dev/null 2>&1; then
+          echo "::error::core is not on PATH after installing via $method"
+          exit 1
+        fi
+        reported="$(core --help 2>/dev/null | sed -E 's/\x1b\[[0-9;]*m//g' | head -1)"
+
+        echo "[DEBUG_LOG] (core) $reported via $method"
+        echo "CORE_VERSION=$version" >> "$GITHUB_OUTPUT"
+        echo "CORE_METHOD=$method" >> "$GITHUB_OUTPUT"
