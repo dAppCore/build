@@ -17,11 +17,11 @@ Usage
 ```yaml
 - name: Discovery
   id: disc
-  uses: snider/build/actions/discovery@v3
+  uses: dAppCore/build/actions/discovery@v4
 
 - name: Compute Options
   id: opts
-  uses: snider/build/actions/options@v3
+  uses: dAppCore/build/actions/options@v4
   with:
     build-obfuscate: 'true'
     build-tags: 'release'

@@ -18,7 +18,7 @@ Inputs
 Usage
 ```yaml
 - name: Package & Release
-  uses: snider/build/actions/package@v3
+  uses: dAppCore/build/actions/package@v4
   with:
     package: 'true'
     build-name: 'wailsApp'

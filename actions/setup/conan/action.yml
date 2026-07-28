@@ -27,7 +27,9 @@ runs:
   using: "composite"
   steps:
     - name: Install uv
-      uses: astral-sh/setup-uv@v9
+      # Pinned to the exact release: setup-uv publishes floating major tags
+      # only up to v7, so @v9 does not resolve even though v9.0.0 exists.
+      uses: astral-sh/setup-uv@v9.0.0
       with:
         enable-cache: true
         cache-suffix: conan-${{ inputs.version }}
