@@ -212,7 +212,12 @@ runs:
         fi
 
         asset="${prefix}-${os}-${arch}.zip"
-        out="$PWD/.release-assets/$asset"
+        # Relative, deliberately. $PWD under Git Bash on Windows is /d/a/... and
+        # PowerShell reads that as D:\d\a\..., so an absolute path handed
+        # across the two shells points somewhere that does not exist. Both
+        # tools inherit this working directory, so neither needs telling where
+        # it is.
+        out=".release-assets/$asset"
 
         # zip is the tool. It is on every Linux and macOS runner and it keeps
         # the executable bit — an archive that unpacks to a non-executable file
@@ -223,7 +228,7 @@ runs:
         # deliberately not used — assuming it is present is exactly the kind of
         # dependency a packaging step should not add.
         if command -v zip >/dev/null 2>&1; then
-          ( cd .release-staging && zip -q -X "$out" ./* )
+          ( cd .release-staging && zip -q -X "../$out" ./* )
         elif command -v pwsh >/dev/null 2>&1 || command -v powershell >/dev/null 2>&1; then
           PS_BIN=pwsh
           command -v pwsh >/dev/null 2>&1 || PS_BIN=powershell
