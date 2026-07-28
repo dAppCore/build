@@ -5,9 +5,9 @@ permissions:
 
 on:
   push:
-    branches: [ "main", "v3", "dev", "*-*" ]
+    branches: [ "main", "*-*" ]
   pull_request:
-    branches: [ "main", "v3", "dev", "*-*" ]
+    branches: [ "main", "*-*" ]
   workflow_dispatch:
 
 jobs:
@@ -496,6 +496,30 @@ jobs:
           include-meta: 'true'
       - name: Note
         run: echo "[DEBUG_LOG] README snippets validated"
+
+  # Every other job runs the actions from `./` — the tree under test. That
+  # proves the code, and proves nothing about the name people actually type.
+  # The wrappers reach for each other as `dAppCore/build/actions/…@v4`, and
+  # those references are unresolvable until the tag exists, so this is the one
+  # check that has to consume the published tag rather than the checkout.
+  published-tag:
+    name: Published dAppCore/build@v4 resolves
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Discovery, from the tag
+        id: disc
+        uses: dAppCore/build/actions/discovery@v4
+        with:
+          working-directory: tdd/wails3-root
+      - name: Assert the published tree answers
+        shell: bash
+        env:
+          GOT: ${{ steps.disc.outputs.PRIMARY_STACK_SUGGESTION }}
+        run: |
+          set -euo pipefail
+          echo "[DEBUG_LOG] @v4 discovery says: $GOT"
+          test "$GOT" = "wails3"
 
   build-wails2:
     name: Build Wails2 project (actual compilation)

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Overview
 
-This is `snider/build@v3` - a modular, multi-stack GitHub Actions build system. The primary use case is building Wails v2 desktop applications, with planned support for Wails v3 and C++.
+This is `dAppCore/build@v4` - a modular, multi-stack GitHub Actions build system. It builds Wails v2 and Wails v3 desktop applications and plain Go binaries, with C++ planned.
 
 ## The Pipeline Pattern
 
@@ -66,7 +66,7 @@ Outputs:
   - REF, BRANCH, TAG, IS_TAG, SHA, SHORT_SHA (git context)
   - HAS_ROOT_PACKAGE_JSON, HAS_FRONTEND_PACKAGE_JSON, HAS_ROOT_GO_MOD,
     HAS_ROOT_MAIN_GO, HAS_ROOT_CMAKELISTS (file markers)
-  - PRIMARY_STACK_SUGGESTION (computed: wails2|cpp|unknown)
+  - PRIMARY_STACK_SUGGESTION (computed: wails3|wails2|cpp|unknown)
 ```
 
 **Go equivalent**: A `Discover()` function returning a `Context` struct.
@@ -202,12 +202,13 @@ act -j options-tests            # Test options computation
 act -j setup-go-tests           # Test Go/Wails setup
 ```
 
-**CI runs automatically** on push to `main`, `v3`, `dev`, and feature branches. The workflow gates app builds behind fast sub-action tests.
+**CI runs automatically** on push to `main` and feature branches. The workflow gates app builds behind fast sub-action tests.
 
 ## Testing Strategy
 
 CI uses fixture directories in `tdd/` to validate stack detection:
 - `tdd/wails2-root/` - Wails v2 project structure (go.mod + frontend/package.json)
+- `tdd/wails3-root/` - Wails v3 project structure (go/go.mod requiring wails/v3, frontend-ng/, Taskfile)
 - `tdd/cpp-root/` - C++ project structure (CMakeLists.txt)
 - `tdd/node-only/` - Node.js only project (package.json, no Go)
 - `tdd/docs/` - Documentation-only project (mkdocs.yml)
