@@ -1,0 +1,6 @@
+{
+  "name": "@example/library-ui",
+  "private": true,
+  "type": "module",
+  "scripts": { "build": "vite build" }
+}

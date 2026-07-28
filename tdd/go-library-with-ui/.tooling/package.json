@@ -1,0 +1,5 @@
+{
+  "name": "@example/tooling",
+  "private": true,
+  "description": "A manifest that describes tooling, not a frontend"
+}

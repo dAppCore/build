@@ -132,7 +132,11 @@ runs:
         if [ -f "frontend/package.json" ]; then has_frontend_pkg=1; found_files+=("frontend/package.json"); fi
         # Light subtree search up to depth 2 for package.json and mkdocs.yml
         if command -v find >/dev/null 2>&1; then
-          if find . -maxdepth 2 -mindepth 2 -name package.json | grep -q .; then has_sub_npm=1; fi
+          # Excluding dot-directories: .claude-plugin, .github and friends
+          # carry a package.json that describes tooling, not a frontend, and
+          # counting them made a Go library look like a desktop app.
+          if find . -maxdepth 2 -mindepth 2 -name package.json \
+               -not -path './.*' -not -path '*/node_modules/*' | grep -q .; then has_sub_npm=1; fi
           if find . -maxdepth 2 -mindepth 1 -name mkdocs.yml | grep -q .; then has_sub_mkdocs=1; fi
         fi
         # Wails v3 declares itself in the module. That is the only marker that
@@ -192,6 +196,7 @@ runs:
         # and tests. `main.go` at the root is the simple case; cmd/<name>/main.go
         # is the common one, and go/cmd/... the nested-module variant.
         has_go_main="$has_main_go"
+        if [ "$has_go_main" -eq 0 ] && [ -f "go/main.go" ]; then has_go_main=1; fi
         if [ "$has_go_main" -eq 0 ] && command -v find >/dev/null 2>&1; then
           if find cmd go/cmd -maxdepth 2 -name main.go 2>/dev/null | grep -q .; then
             has_go_main=1
@@ -199,8 +204,19 @@ runs:
         fi
         # Suggest stack
         suggestion="unknown"
-        if { [ "$has_go_mod" -eq 1 ] || [ "$has_main_go" -eq 1 ]; } && { [ "$has_root_pkg" -eq 1 ] || [ "$has_frontend_pkg" -eq 1 ] || [ "$has_sub_npm" -eq 1 ]; }; then
-          if [ "$has_wails_v3" -eq 1 ]; then suggestion="wails3"; else suggestion="wails2"; fi
+        has_frontend=0
+        if [ "$has_root_pkg" -eq 1 ] || [ "$has_frontend_pkg" -eq 1 ] || [ "$has_sub_npm" -eq 1 ]; then has_frontend=1; fi
+
+        # A module requiring wails/v3 has said what it is; nothing else needs
+        # checking. v2 declares itself nowhere, so it is inferred — and the
+        # inference now requires a main package, because a Wails app produces a
+        # binary and a module with no command cannot be one. Without that, a Go
+        # library that happens to have a UI directory beside it was read as a
+        # desktop app.
+        if [ "$has_go_mod" -eq 1 ] && [ "$has_wails_v3" -eq 1 ]; then
+          suggestion="wails3"
+        elif [ "$has_go_mod" -eq 1 ] && [ "$has_go_main" -eq 1 ] && [ "$has_frontend" -eq 1 ]; then
+          suggestion="wails2"
         elif [ "$has_go_mod" -eq 1 ] && [ "$has_go_main" -eq 1 ]; then
           suggestion="go"
         elif [ "$has_go_mod" -eq 1 ]; then
@@ -262,7 +278,8 @@ runs:
         if (Test-Path mkdocs.yml) { $has_mkdocs=1; $found+="mkdocs.yml" }
         if (Test-Path frontend/package.json) { $has_frontend_pkg=1; $found+="frontend/package.json" }
         # Limited subtree search (depth ~2)
-        Get-ChildItem -Recurse -Depth 2 -Filter package.json -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notlike "*node_modules*" } | ForEach-Object { $has_sub_npm=1 }
+        # Dot-directories carry tooling manifests, not frontends.
+        Get-ChildItem -Recurse -Depth 2 -Filter package.json -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notlike "*node_modules*" -and $_.FullName -notlike "*$([IO.Path]::DirectorySeparatorChar).*" } | ForEach-Object { $has_sub_npm=1 }
         Get-ChildItem -Recurse -Depth 2 -Filter mkdocs.yml -ErrorAction SilentlyContinue | ForEach-Object { $has_sub_mkdocs=1 }
         # Wails v3 declares itself in the module — the only marker that
         # separates it from v2 without guessing.
@@ -302,6 +319,7 @@ runs:
 
         # A module producing a command is a different job from a library one.
         $has_go_main = $has_main_go
+        if (($has_go_main -eq 0) -and (Test-Path go/main.go)) { $has_go_main = 1 }
         if ($has_go_main -eq 0) {
           foreach ($dir in @("cmd", "go/cmd")) {
             if (Test-Path $dir) {
@@ -310,9 +328,12 @@ runs:
           }
         }
         $suggestion = "unknown"
-        if ((($has_go_mod -eq 1) -or ($has_main_go -eq 1)) -and (($has_root_pkg -eq 1) -or ($has_frontend_pkg -eq 1) -or ($has_sub_npm -eq 1))) {
-          if ($has_wails_v3 -eq 1) { $suggestion = "wails3" } else { $suggestion = "wails2" }
-        }
+        $has_frontend = 0
+        if (($has_root_pkg -eq 1) -or ($has_frontend_pkg -eq 1) -or ($has_sub_npm -eq 1)) { $has_frontend = 1 }
+        # v3 declares itself in the module; v2 is inferred, and the inference
+        # requires a main package because a Wails app produces a binary.
+        if (($has_go_mod -eq 1) -and ($has_wails_v3 -eq 1)) { $suggestion = "wails3" }
+        elseif (($has_go_mod -eq 1) -and ($has_go_main -eq 1) -and ($has_frontend -eq 1)) { $suggestion = "wails2" }
         elseif (($has_go_mod -eq 1) -and ($has_go_main -eq 1)) { $suggestion = "go" }
         elseif ($has_go_mod -eq 1) { $suggestion = "core" }
         elseif ($has_cmake -eq 1) { $suggestion = "cpp" }
