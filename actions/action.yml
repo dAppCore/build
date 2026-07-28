@@ -72,13 +72,26 @@ runs:
 
     - name: Call Wails v2 wrapper
       if: steps.sel.outputs.SELECTED_STACK == 'wails2'
-      uses: host-uk/build/actions/build/wails2@dev
+      uses: dAppCore/build/actions/build/wails2@v4
       with:
         build: ${{ inputs.build }}
         sign: ${{ inputs.sign }}
         package: ${{ inputs.package }}
         build-name: ${{ inputs.build-name }}
         build-platform: ${{ inputs.build-platform }}
+        app-working-directory: ${{ inputs.app-working-directory }}
+
+    # v3 takes no build-platform: the project's Taskfile owns the target, and
+    # the runner decides which one. Passing a platform here would offer a
+    # choice the stack cannot honour.
+    - name: Call Wails v3 wrapper
+      if: steps.sel.outputs.SELECTED_STACK == 'wails3'
+      uses: dAppCore/build/actions/build/wails3@v4
+      with:
+        build: ${{ inputs.build }}
+        sign: ${{ inputs.sign }}
+        package: ${{ inputs.package }}
+        build-name: ${{ inputs.build-name }}
         app-working-directory: ${{ inputs.app-working-directory }}
 outputs:
   SELECTED_STACK:

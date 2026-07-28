@@ -1,0 +1,121 @@
+name: "Build Wails v3 App"
+description: >
+  Builds a Wails v3 application through its Taskfile and normalises the
+  executable bits per OS.
+
+  Wails v3 is not v2 with a new flag set. There is no `wails build` invocation
+  to compose: the project owns a Taskfile, wails3 runs targets in it, and the
+  per-platform targets are where the real build lives. So this action runs the
+  project's own target rather than reconstructing the command, which keeps CI
+  and a developer's local build the same path.
+
+inputs:
+  build:
+    description: "Whether to run the build"
+    required: false
+    default: "true"
+  app-working-directory:
+    description: "Root of the app being built"
+    required: false
+    default: "."
+  build-name:
+    description: "Binary or bundle name, used to locate the output"
+    required: true
+  task:
+    description: >
+      Taskfile target to run. Defaults to <os>:build, resolved from the runner —
+      darwin:build, linux:build, windows:build — which is the wails3 convention.
+    required: false
+    default: ""
+  wails3-tool:
+    description: >
+      How to invoke wails3. Defaults to `go tool wails3`, which resolves the
+      version pinned by the project's own go.mod tool directive rather than
+      whatever a global install happens to be. Set to `wails3` to use a CLI on
+      PATH instead.
+    required: false
+    default: "go tool wails3"
+
+outputs:
+  TASK_RUN:
+    description: "The Taskfile target that was executed"
+    value: ${{ steps.target.outputs.TASK }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Resolve the Taskfile target
+      id: target
+      shell: bash
+      working-directory: ${{ inputs.app-working-directory }}
+      env:
+        REQUESTED: ${{ inputs.task }}
+      run: |
+        set -euo pipefail
+        if [ -n "$REQUESTED" ]; then
+          TASK="$REQUESTED"
+        else
+          case "${RUNNER_OS}" in
+            macOS)   TASK="darwin:build" ;;
+            Linux)   TASK="linux:build" ;;
+            Windows) TASK="windows:build" ;;
+            *) echo "::error::unsupported runner OS '${RUNNER_OS}'"; exit 1 ;;
+          esac
+        fi
+        echo "TASK=$TASK" >> "$GITHUB_OUTPUT"
+        echo "[DEBUG_LOG] (wails3) target=$TASK"
+
+    # A project that pins wails3 with a go.mod tool directive builds with the
+    # version it was tested against. Falling back to an install is for projects
+    # that have not adopted the directive; saying which happened matters when a
+    # build behaves differently from a developer's machine.
+    - name: Ensure the wails3 CLI is available
+      shell: bash
+      working-directory: ${{ inputs.app-working-directory }}
+      env:
+        TOOL: ${{ inputs.wails3-tool }}
+      run: |
+        set -euo pipefail
+        if [ "$TOOL" = "go tool wails3" ]; then
+          if grep -qE '^tool .*wails/v3/cmd/wails3' go/go.mod 2>/dev/null \
+          || grep -qE '^tool .*wails/v3/cmd/wails3' go.mod 2>/dev/null; then
+            echo "[DEBUG_LOG] (wails3) using the module-pinned CLI"
+            exit 0
+          fi
+          echo "::warning::no go.mod tool directive for wails3; installing the CLI"
+          go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+        fi
+
+    - name: Install Task
+      shell: bash
+      run: |
+        set -euo pipefail
+        if ! command -v task >/dev/null 2>&1; then
+          go install github.com/go-task/task/v3/cmd/task@latest
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+        fi
+
+    - name: Build
+      if: inputs.build == 'true'
+      shell: bash
+      working-directory: ${{ inputs.app-working-directory }}
+      run: ${{ inputs.wails3-tool }} task ${{ steps.target.outputs.TASK }}
+
+    # wails3 writes to bin/. The bundle layout differs per platform, so the
+    # executable bit is set where each platform actually keeps the binary.
+    - name: Normalise macOS permissions
+      if: inputs.build == 'true' && runner.os == 'macOS'
+      shell: bash
+      working-directory: ${{ inputs.app-working-directory }}
+      run: |
+        set -euo pipefail
+        chmod +x bin/*.app/Contents/MacOS/* 2>/dev/null || true
+        [ -f "bin/${{ inputs.build-name }}" ] && chmod +x "bin/${{ inputs.build-name }}" || true
+
+    - name: Normalise Linux permissions
+      if: inputs.build == 'true' && runner.os == 'Linux'
+      shell: bash
+      working-directory: ${{ inputs.app-working-directory }}
+      run: |
+        set -euo pipefail
+        find bin -maxdepth 1 -type f -exec chmod +x {} + 2>/dev/null || true

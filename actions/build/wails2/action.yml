@@ -181,13 +181,13 @@ runs:
 
     - name: Discovery
       id: discovery
-      uses: host-uk/build/actions/discovery@dev
+      uses: dAppCore/build/actions/discovery@v4
       with:
         working-directory: ${{ inputs.app-working-directory }}
 
     - name: Compute Build Options
       id: build_options
-      uses: host-uk/build/actions/options@dev
+      uses: dAppCore/build/actions/options@v4
       with:
         build-obfuscate: ${{ steps.wcfg.outputs.OBFUSCATE }}
         build-tags: ${{ steps.wcfg.outputs.BUILD_TAGS }}
@@ -195,7 +195,7 @@ runs:
         distro: ${{ steps.discovery.outputs.DISTRO }}
 
     - name: Setup toolchains (Go/Node/Deno/Wails)
-      uses: host-uk/build/actions/setup@dev
+      uses: dAppCore/build/actions/setup@v4
       with:
         go-version: ${{ steps.wcfg.outputs.GO_VER }}
         build-cache: ${{ inputs.build-cache }}
@@ -233,7 +233,7 @@ runs:
         npm install -g $npm_packages
 
     - name: Build Wails app
-      uses: host-uk/build/actions/build/wails2/build@dev
+      uses: dAppCore/build/actions/build/wails2/build@v4
       with:
         build: ${{ inputs.build }}
         app-working-directory: ${{ inputs.app-working-directory }}
@@ -243,7 +243,7 @@ runs:
         build-options: ${{ steps.build_options.outputs.BUILD_OPTIONS }}
 
     - name: Sign artifacts (OS-conditional)
-      uses: host-uk/build/actions/sign@dev
+      uses: dAppCore/build/actions/sign@v4
       with:
         sign: ${{ inputs.sign }}
         app-working-directory: ${{ inputs.app-working-directory }}
@@ -259,7 +259,7 @@ runs:
         sign-windows-cert-password: ${{ steps.wcfg.outputs.SIGN_WINDOWS_CERT_PASSWORD }}
 
     - name: Package & release
-      uses: host-uk/build/actions/package@dev
+      uses: dAppCore/build/actions/package@v4
       with:
         package: ${{ inputs.package }}
         build-name: ${{ inputs.build-name }}
