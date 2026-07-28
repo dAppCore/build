@@ -59,6 +59,10 @@ inputs:
     description: "Run benchmarks after the tests"
     required: false
     default: "false"
+  release-asset-prefix:
+    description: "Base name for release assets, before the -<os>-<arch> suffix"
+    required: false
+    default: ""
   go-directory:
     description: "Where the Go module lives, relative to the working directory"
     required: false
@@ -100,6 +104,7 @@ runs:
         build-platform: ${{ inputs.build-platform }}
         app-working-directory: ${{ inputs.app-working-directory }}
         go-directory: ${{ inputs.go-directory }}
+        release-asset-prefix: ${{ inputs.release-asset-prefix }}
         main-package: ${{ inputs.main-package }}
         build-tags: ${{ inputs.build-tags }}
         ldflags: ${{ inputs.ldflags }}

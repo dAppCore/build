@@ -47,6 +47,10 @@ inputs:
     description: "Where the binary is written"
     required: false
     default: "bin"
+  release-asset-prefix:
+    description: "Base name for release assets, before the -<os>-<arch> suffix"
+    required: false
+    default: ""
   app-working-directory:
     description: "Directory holding deno.json"
     required: false
@@ -138,3 +142,4 @@ runs:
         tag: ${{ steps.discovery.outputs.TAG }}
         is-tag: ${{ steps.discovery.outputs.IS_TAG }}
         short-sha: ${{ steps.discovery.outputs.SHORT_SHA }}
+        release-asset-prefix: ${{ inputs.release-asset-prefix }}

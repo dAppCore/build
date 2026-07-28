@@ -32,6 +32,14 @@ inputs:
     description: "Git ref (optional, from discovery)."
     required: false
     default: ""
+  release-asset-prefix:
+    description: >
+      Base name for release assets, before the -<os>-<arch> suffix. Defaults to
+      build-name. Assets are named without a version so that
+      /releases/latest/download/<name> resolves, which is what makes a release
+      usable as a download source rather than only as a record.
+    required: false
+    default: ""
   include-meta:
     description: "Include artifact_meta.json with discovery metadata in the uploaded artifact"
     required: false
@@ -152,11 +160,57 @@ runs:
           **/bin/
           *\bin\*
           artifact_meta.json
+    # Release assets need names that are unique across platforms and stable
+    # across versions. The raw file is called `core` on Linux and macOS alike,
+    # so all three jobs uploaded an asset with the same name and clobbered each
+    # other; and a name containing the version cannot be fetched from
+    # /releases/latest/download/<name>, which is the whole point of publishing
+    # one. So each binary is staged as <prefix>-<os>-<arch><ext> first.
+    - name: Stage release assets
+      id: assets
+      if: inputs.package == 'true' && startsWith(github.ref, 'refs/tags/')
+      shell: bash
+      env:
+        PREFIX: ${{ inputs.release-asset-prefix }}
+        BUILD_NAME: ${{ inputs.build-name }}
+        IN_OS: ${{ inputs.os }}
+        IN_ARCH: ${{ inputs.arch }}
+      run: |
+        set -euo pipefail
+        prefix="${PREFIX:-$BUILD_NAME}"
+
+        # GOOS names rather than the runner's: a script choosing what to
+        # download computes them from uname, and darwin is what it gets.
+        case "$(printf '%s' "${IN_OS:-$RUNNER_OS}" | tr '[:upper:]' '[:lower:]')" in
+          *mac*|*darwin*) os=darwin ;;
+          *win*)          os=windows ;;
+          *linux*)        os=linux ;;
+          *)              os="$(printf '%s' "${IN_OS:-unknown}" | tr '[:upper:]' '[:lower:]')" ;;
+        esac
+        arch="${IN_ARCH:-amd64}"
+
+        mkdir -p .release-assets
+        staged=0
+        while IFS= read -r f; do
+          [ -f "$f" ] || continue
+          case "$f" in *.json) continue ;; esac
+          ext=""
+          case "$f" in *.*) ext=".${f##*.}" ;; esac
+          cp "$f" ".release-assets/${prefix}-${os}-${arch}${ext}"
+          staged=$((staged+1))
+        done < <(find . -path '*/bin/*' -type f -not -path './.release-assets/*' 2>/dev/null)
+
+        if [ "$staged" -eq 0 ]; then
+          echo "::warning::no files under */bin/ to release"
+        fi
+        echo "[DEBUG_LOG] staged $staged asset(s) as ${prefix}-${os}-${arch}*"
+        ls -la .release-assets || true
+
     - name: Release
       uses: softprops/action-gh-release@v1
       if: inputs.package == 'true' && startsWith(github.ref, 'refs/tags/')
       with:
-        name: ${{ steps.meta.outputs.ARTIFACT_NAME }}
-        files: |
-          **/bin/*
-          artifact_meta.json
+        # The tag names the release. It used to be the artifact name, so
+        # whichever platform's job finished first decided the release title.
+        name: ${{ inputs.tag }}
+        files: .release-assets/*

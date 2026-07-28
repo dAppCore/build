@@ -60,6 +60,10 @@ inputs:
     required: false
     default: "false"
     description: "Run benchmarks after the tests"
+  release-asset-prefix:
+    description: "Base name for release assets, before the -<os>-<arch> suffix"
+    required: false
+    default: ""
   go-directory:
     required: false
     default: ""
@@ -131,6 +135,7 @@ runs:
         build-name: ${{ inputs.build-name }}
         build-platform: ${{ inputs.build-platform }}
         app-working-directory: ${{ inputs.app-working-directory }}
+        release-asset-prefix: ${{ inputs.release-asset-prefix }}
 
     # v3 takes no build-platform: the project's Taskfile owns the target, and
     # the runner decides which one. Passing a platform here would offer a
@@ -145,6 +150,7 @@ runs:
         package: ${{ inputs.package }}
         build-name: ${{ inputs.build-name }}
         app-working-directory: ${{ inputs.app-working-directory }}
+        release-asset-prefix: ${{ inputs.release-asset-prefix }}
 
     - name: Call Go wrapper
       id: go
@@ -157,7 +163,9 @@ runs:
         build-name: ${{ inputs.build-name }}
         build-platform: ${{ inputs.build-platform }}
         app-working-directory: ${{ inputs.app-working-directory }}
+        release-asset-prefix: ${{ inputs.release-asset-prefix }}
         go-directory: ${{ inputs.go-directory }}
+        release-asset-prefix: ${{ inputs.release-asset-prefix }}
         main-package: ${{ inputs.main-package }}
         build-tags: ${{ inputs.build-tags }}
         ldflags: ${{ inputs.ldflags }}
@@ -181,6 +189,7 @@ runs:
         package: ${{ inputs.package }}
         build-name: ${{ inputs.build-name }}
         app-working-directory: ${{ inputs.app-working-directory }}
+        release-asset-prefix: ${{ inputs.release-asset-prefix }}
 
     - name: Call Node wrapper
       id: node
@@ -191,6 +200,7 @@ runs:
         package: ${{ inputs.package }}
         build-name: ${{ inputs.build-name }}
         app-working-directory: ${{ inputs.app-working-directory }}
+        release-asset-prefix: ${{ inputs.release-asset-prefix }}
 
     - name: Call Bun wrapper
       id: bun
@@ -201,6 +211,7 @@ runs:
         package: ${{ inputs.package }}
         build-name: ${{ inputs.build-name }}
         app-working-directory: ${{ inputs.app-working-directory }}
+        release-asset-prefix: ${{ inputs.release-asset-prefix }}
 
     - name: Call Deno wrapper
       id: deno
@@ -212,6 +223,7 @@ runs:
         package: ${{ inputs.package }}
         build-name: ${{ inputs.build-name }}
         app-working-directory: ${{ inputs.app-working-directory }}
+        release-asset-prefix: ${{ inputs.release-asset-prefix }}
 
     # core is a library pipeline, not a builder — vet, test, lint, vulncheck.
     # It produces no artifact, so `build-name` and `package` do not reach it and
@@ -223,7 +235,9 @@ runs:
       uses: dAppCore/build/actions/build/core@v4
       with:
         app-working-directory: ${{ inputs.app-working-directory }}
+        release-asset-prefix: ${{ inputs.release-asset-prefix }}
         go-directory: ${{ inputs.go-directory }}
+        release-asset-prefix: ${{ inputs.release-asset-prefix }}
 outputs:
   SELECTED_STACK:
     description: "Stack selected by the orchestrator"
