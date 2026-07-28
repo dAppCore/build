@@ -63,6 +63,19 @@ inputs:
     description: "Base name for release assets, before the -<os>-<arch> suffix"
     required: false
     default: ""
+  entry:
+    description: >
+      Deno stack: entry module to compile. Empty probes for run.ts, main.ts,
+      mod.ts, src/main.ts and app.ts in that order.
+    required: false
+    default: ""
+  permissions:
+    description: >
+      Deno stack: permission flags baked into the compiled binary. The default
+      is read-only over the network; a server that writes files or spawns
+      processes needs more.
+    required: false
+    default: ""
   deb:
     description: >
       Attach a .deb to the release. Linux runners only, and only on a tag.
@@ -119,6 +132,8 @@ runs:
         app-working-directory: ${{ inputs.app-working-directory }}
         go-directory: ${{ inputs.go-directory }}
         release-asset-prefix: ${{ inputs.release-asset-prefix }}
+        entry: ${{ inputs.entry }}
+        permissions: ${{ inputs.permissions }}
         deb: ${{ inputs.deb }}
         deb-maintainer: ${{ inputs.deb-maintainer }}
         deb-description: ${{ inputs.deb-description }}

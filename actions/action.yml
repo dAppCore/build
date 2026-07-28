@@ -64,6 +64,14 @@ inputs:
     description: "Base name for release assets, before the -<os>-<arch> suffix"
     required: false
     default: ""
+  entry:
+    description: "Deno stack: entry module to compile. Empty probes for the usual names."
+    required: false
+    default: ""
+  permissions:
+    description: "Deno stack: permission flags baked into the compiled binary"
+    required: false
+    default: ""
   deb:
     description: "Attach a .deb to the release. Linux runners only, Go stack only."
     required: false
@@ -238,6 +246,8 @@ runs:
         build-name: ${{ inputs.build-name }}
         app-working-directory: ${{ inputs.app-working-directory }}
         release-asset-prefix: ${{ inputs.release-asset-prefix }}
+        entry: ${{ inputs.entry }}
+        permissions: ${{ inputs.permissions }}
 
     # core is a library pipeline, not a builder — vet, test, lint, vulncheck.
     # It produces no artifact, so `build-name` and `package` do not reach it and
