@@ -34,6 +34,7 @@ export default defineConfig({
 					items: [
 						{ label: 'Wails v3', slug: 'stacks/wails3' },
 						{ label: 'Wails v2', slug: 'stacks/wails2' },
+						{ label: 'Go binaries', slug: 'stacks/go' },
 						{ label: 'C++', slug: 'stacks/cpp' },
 						{ label: 'Go libraries', slug: 'stacks/core' },
 					],

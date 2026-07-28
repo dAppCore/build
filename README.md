@@ -4,7 +4,7 @@
 [![Licence: EUPL-1.2](https://img.shields.io/badge/licence-EUPL--1.2-blue.svg)](LICENSE)
 
 One GitHub Action that reads your repository, works out what it is, and builds
-it — Wails v3, Wails v2, or a plain Go binary, on Linux, macOS and Windows.
+it — Wails v3, Wails v2, Go and C++, on Linux, macOS and Windows.
 
 ```yaml
 - uses: actions/checkout@v4
@@ -24,7 +24,9 @@ a workflow artifact, and publishes a GitHub release when the ref is a tag.
 | [How detection works](https://dappco.re/build/detection/) | What it reads, what it concludes, how to overrule it |
 | [Wails v3](https://dappco.re/build/stacks/wails3/) | Runs your Taskfile target — so CI takes the path you do |
 | [Wails v2](https://dappco.re/build/stacks/wails2/) | Composes `wails build` flags from inputs |
-| [Go binaries](https://dappco.re/build/stacks/core/) | A Go project with no frontend |
+| [Go binaries](https://dappco.re/build/stacks/go/) | A module, a main package, a binary |
+| [C++](https://dappco.re/build/stacks/cpp/) | Conan 2 resolves, CMake builds |
+| [Go libraries](https://dappco.re/build/stacks/core/) | vet, test, lint, govulncheck — no artifact |
 | [Inputs](https://dappco.re/build/reference/inputs/) | Every input, on the root action and each wrapper |
 | [Sub-actions](https://dappco.re/build/reference/sub-actions/) | Discovery, setup, build, sign and package, each callable alone |
 | [Packaging & releases](https://dappco.re/build/reference/packaging/) | Artifact naming, and what a tag changes |

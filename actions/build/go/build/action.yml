@@ -1,0 +1,156 @@
+name: "Build Go binary"
+description: >
+  Plain `go build`. No framework, no Taskfile, no conanfile — a module, a main
+  package, and a binary out the other end.
+
+inputs:
+  build:
+    description: "Whether to run the build"
+    required: false
+    default: "true"
+  app-working-directory:
+    description: "Root of the project"
+    required: false
+    default: "."
+  go-directory:
+    description: >
+      Where the module lives, relative to the working directory. Defaults to
+      the working directory itself; set to `go` for the nested layout.
+    required: false
+    default: ""
+  build-name:
+    description: "Name of the binary"
+    required: true
+  main-package:
+    description: >
+      Package to build. Defaults to `.` when there is a main.go beside the
+      module, otherwise the single directory under cmd/ — which is
+      unambiguous for the overwhelmingly common one-command module, and an
+      error worth reporting when there are several.
+    required: false
+    default: ""
+  build-platform:
+    description: >
+      Target as `os/arch`, e.g. `linux/amd64`. Empty builds for the runner,
+      which is what a matrix wants.
+    required: false
+    default: ""
+  build-tags:
+    description: "Comma-separated build tags"
+    required: false
+    default: ""
+  ldflags:
+    description: "Passed to -ldflags"
+    required: false
+    default: ""
+  trimpath:
+    description: "Build with -trimpath"
+    required: false
+    default: "true"
+  cgo:
+    description: >
+      `auto` leaves CGO_ENABLED alone, which is right when building for the
+      runner. `1` and `0` set it — `0` is what makes a cross-compile work
+      without a C toolchain, and `1` is required on Windows for prebuilt cgo
+      bindings, since Windows does not enable it on its own.
+    required: false
+    default: "auto"
+  output-directory:
+    description: "Where the binary is written, relative to the working directory"
+    required: false
+    default: "bin"
+
+outputs:
+  BINARY_PATH:
+    description: "Path to the built binary, relative to the working directory"
+    value: ${{ steps.build.outputs.BINARY_PATH }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Build
+      id: build
+      if: inputs.build == 'true'
+      shell: bash
+      working-directory: ${{ inputs.app-working-directory }}
+      env:
+        GO_DIR: ${{ inputs.go-directory }}
+        NAME: ${{ inputs.build-name }}
+        PKG: ${{ inputs.main-package }}
+        PLATFORM: ${{ inputs.build-platform }}
+        TAGS: ${{ inputs.build-tags }}
+        LDFLAGS: ${{ inputs.ldflags }}
+        TRIMPATH: ${{ inputs.trimpath }}
+        CGO: ${{ inputs.cgo }}
+        OUT_DIR: ${{ inputs.output-directory }}
+      run: |
+        set -euo pipefail
+
+        # The module may be at the working directory or one level down. The
+        # binary goes to OUT_DIR relative to the working directory either way,
+        # so a nested module does not bury its output inside go/.
+        go_dir="${GO_DIR:-.}"
+        out_prefix=""
+        if [ "$go_dir" != "." ] && [ -n "$go_dir" ]; then
+          depth="$(echo "$go_dir" | tr -cd '/' | wc -c | tr -d ' ')"
+          out_prefix="../"
+          i=0; while [ "$i" -lt "$depth" ]; do out_prefix="../$out_prefix"; i=$((i+1)); done
+        fi
+
+        pkg="$PKG"
+        if [ -z "$pkg" ]; then
+          if [ -f "$go_dir/main.go" ]; then
+            pkg="."
+          else
+            mapfile -t cmds < <(find "$go_dir/cmd" -maxdepth 2 -name main.go 2>/dev/null | sed "s|^$go_dir/||;s|/main.go$||" | sort)
+            if [ "${#cmds[@]}" -eq 1 ]; then
+              pkg="./${cmds[0]}"
+            elif [ "${#cmds[@]}" -eq 0 ]; then
+              echo "::error::no main package found — expected main.go beside the module or under cmd/. Set main-package to say which."
+              exit 1
+            else
+              echo "::error::${#cmds[@]} main packages found (${cmds[*]}). Set main-package to choose one."
+              exit 1
+            fi
+          fi
+        fi
+
+        if [ -n "$PLATFORM" ]; then
+          export GOOS="${PLATFORM%%/*}"
+          export GOARCH="${PLATFORM##*/}"
+          echo "[DEBUG_LOG] (go) cross-compiling for $GOOS/$GOARCH"
+        fi
+
+        # Extension follows the target, not the runner: cross-compiling to
+        # windows from Linux still needs .exe.
+        ext=""
+        target_os="${GOOS:-}"
+        if [ -z "$target_os" ] && [ "${RUNNER_OS}" = "Windows" ]; then target_os="windows"; fi
+        if [ "$target_os" = "windows" ]; then ext=".exe"; fi
+
+        if [ "$CGO" != "auto" ]; then
+          export CGO_ENABLED="$CGO"
+          echo "[DEBUG_LOG] (go) CGO_ENABLED=$CGO"
+        fi
+
+        mkdir -p "$OUT_DIR"
+        binary="$OUT_DIR/$NAME$ext"
+
+        args=(build -o "$out_prefix$binary")
+        [ "$TRIMPATH" = "true" ] && args+=(-trimpath)
+        [ -n "$TAGS" ] && args+=(-tags "$TAGS")
+        [ -n "$LDFLAGS" ] && args+=(-ldflags "$LDFLAGS")
+        args+=("$pkg")
+
+        echo "[DEBUG_LOG] (go) cd $go_dir && go ${args[*]}"
+        (cd "$go_dir" && go "${args[@]}")
+
+        test -f "$binary"
+        echo "[DEBUG_LOG] (go) binary=$binary"
+        echo "BINARY_PATH=$binary" >> "$GITHUB_OUTPUT"
+
+    - name: Normalise the executable bit
+      if: inputs.build == 'true' && runner.os != 'Windows'
+      shell: bash
+      working-directory: ${{ inputs.app-working-directory }}
+      run: chmod +x "${{ steps.build.outputs.BINARY_PATH }}"

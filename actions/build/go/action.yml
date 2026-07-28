@@ -1,0 +1,129 @@
+name: "Go (full pipeline)"
+description: >
+  Go toolchain, `go build`, sign and package for a plain Go command.
+
+  Nothing framework-shaped: a module, a main package, a binary, an artifact.
+  This is the stack for a CLI or a server — the thing most Go repositories
+  actually are. A module with no main package is a library and wants
+  actions/build/core instead, which runs vet and tests and produces nothing.
+
+inputs:
+  build:
+    description: "Whether to run the build"
+    required: false
+    default: "true"
+  sign:
+    description: "Sign the build (macOS/Windows)"
+    required: false
+    default: "false"
+  package:
+    description: "Upload artifacts and release on tag"
+    required: false
+    default: "true"
+  build-name:
+    description: "The name of the binary"
+    required: true
+  build-platform:
+    description: "Target as os/arch; empty builds for the runner"
+    required: false
+    default: ""
+  go-version:
+    description: "Go version"
+    required: false
+    default: "1.26"
+  build-cache:
+    description: "Enable the Go build cache"
+    required: false
+    default: "true"
+  go-directory:
+    description: "Where the module lives, relative to the working directory"
+    required: false
+    default: ""
+  main-package:
+    description: "Package to build; empty auto-detects"
+    required: false
+    default: ""
+  build-tags:
+    description: "Comma-separated build tags"
+    required: false
+    default: ""
+  ldflags:
+    description: "Passed to -ldflags"
+    required: false
+    default: ""
+  trimpath:
+    description: "Build with -trimpath"
+    required: false
+    default: "true"
+  cgo:
+    description: "auto, 0 or 1"
+    required: false
+    default: "auto"
+  output-directory:
+    description: "Where the binary is written"
+    required: false
+    default: "bin"
+  app-working-directory:
+    description: "Root of the project being built"
+    required: false
+    default: "."
+
+outputs:
+  SELECTED_STACK:
+    description: "Always go; lets the orchestrator report what it chose"
+    value: "go"
+  BINARY_PATH:
+    description: "Path to the built binary, relative to the working directory"
+    value: ${{ steps.build.outputs.BINARY_PATH }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Discovery
+      id: discovery
+      uses: dAppCore/build/actions/discovery@v4
+      with:
+        working-directory: ${{ inputs.app-working-directory }}
+
+    # wails-dev-build skips installing the Wails CLI. A plain Go build has no
+    # use for it, and pulling it would add a minute to every run.
+    - name: Setup Go
+      uses: dAppCore/build/actions/setup/go@v4
+      with:
+        go-version: ${{ inputs.go-version }}
+        build-cache: ${{ inputs.build-cache }}
+        wails-dev-build: 'true'
+
+    - name: Build
+      id: build
+      uses: dAppCore/build/actions/build/go/build@v4
+      with:
+        build: ${{ inputs.build }}
+        app-working-directory: ${{ inputs.app-working-directory }}
+        go-directory: ${{ inputs.go-directory }}
+        build-name: ${{ inputs.build-name }}
+        main-package: ${{ inputs.main-package }}
+        build-platform: ${{ inputs.build-platform }}
+        build-tags: ${{ inputs.build-tags }}
+        ldflags: ${{ inputs.ldflags }}
+        trimpath: ${{ inputs.trimpath }}
+        cgo: ${{ inputs.cgo }}
+        output-directory: ${{ inputs.output-directory }}
+
+    - name: Sign artifacts (OS-conditional)
+      uses: dAppCore/build/actions/sign@v4
+      with:
+        sign: ${{ inputs.sign }}
+        app-working-directory: ${{ inputs.app-working-directory }}
+        build-name: ${{ inputs.build-name }}
+
+    - name: Package & release
+      uses: dAppCore/build/actions/package@v4
+      with:
+        package: ${{ inputs.package }}
+        build-name: ${{ inputs.build-name }}
+        os: ${{ steps.discovery.outputs.OS }}
+        arch: ${{ steps.discovery.outputs.ARCH }}
+        tag: ${{ steps.discovery.outputs.TAG }}
+        is-tag: ${{ steps.discovery.outputs.IS_TAG }}
+        short-sha: ${{ steps.discovery.outputs.SHORT_SHA }}

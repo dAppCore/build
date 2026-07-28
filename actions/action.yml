@@ -72,7 +72,7 @@ runs:
         # worse than failing. Every value that reaches here must have a wrapper
         # below; this catches the gap at the point it is introduced.
         case "$sel_stack" in
-          wails2|wails3|cpp|core) ;;
+          wails2|wails3|go|cpp|core) ;;
           *)
             echo "::error::no wrapper for stack '$sel_stack' — nothing would be built"
             exit 1
@@ -102,6 +102,17 @@ runs:
         sign: ${{ inputs.sign }}
         package: ${{ inputs.package }}
         build-name: ${{ inputs.build-name }}
+        app-working-directory: ${{ inputs.app-working-directory }}
+
+    - name: Call Go wrapper
+      if: steps.sel.outputs.SELECTED_STACK == 'go'
+      uses: dAppCore/build/actions/build/go@v4
+      with:
+        build: ${{ inputs.build }}
+        sign: ${{ inputs.sign }}
+        package: ${{ inputs.package }}
+        build-name: ${{ inputs.build-name }}
+        build-platform: ${{ inputs.build-platform }}
         app-working-directory: ${{ inputs.app-working-directory }}
 
     # cpp takes no build-platform for the same reason v3 does not: the

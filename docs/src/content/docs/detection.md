@@ -24,10 +24,16 @@ telling you something true about the repository's layout.
 ```
 Go module requiring wails/v3        →  wails3
 Go module + a frontend              →  wails2
-Go module alone                     →  core
-CMakeLists.txt                      →  cpp   (planned)
+Go module with a main package       →  go
+Go module without one               →  core
+CMakeLists.txt                      →  cpp
 anything else                       →  unknown
 ```
+
+The last Go split is the one worth knowing: a module producing a command wants
+a binary and an artifact, a module that is a library wants vet and tests. They
+are different jobs, so they are different stacks. A `main.go` beside the module
+or a `cmd/<name>/main.go` is what separates them.
 
 The v2/v3 split reads the Go module because that is the only place the two
 differ unambiguously. Both are Go plus a frontend; only the module says which

@@ -142,10 +142,22 @@ runs:
         if [ -n "$go_mod_path" ] && grep -qE 'wails/v3' "$go_mod_path" 2>/dev/null; then
           has_wails_v3=1
         fi
+        # A module that produces a command is a different job from a module that
+        # is a library: one wants a binary and an artifact, the other wants vet
+        # and tests. `main.go` at the root is the simple case; cmd/<name>/main.go
+        # is the common one, and go/cmd/... the nested-module variant.
+        has_go_main="$has_main_go"
+        if [ "$has_go_main" -eq 0 ] && command -v find >/dev/null 2>&1; then
+          if find cmd go/cmd -maxdepth 2 -name main.go 2>/dev/null | grep -q .; then
+            has_go_main=1
+          fi
+        fi
         # Suggest stack
         suggestion="unknown"
         if { [ "$has_go_mod" -eq 1 ] || [ "$has_main_go" -eq 1 ]; } && { [ "$has_root_pkg" -eq 1 ] || [ "$has_frontend_pkg" -eq 1 ] || [ "$has_sub_npm" -eq 1 ]; }; then
           if [ "$has_wails_v3" -eq 1 ]; then suggestion="wails3"; else suggestion="wails2"; fi
+        elif [ "$has_go_mod" -eq 1 ] && [ "$has_go_main" -eq 1 ]; then
+          suggestion="go"
         elif [ "$has_go_mod" -eq 1 ]; then
           suggestion="core"
         elif [ "$has_cmake" -eq 1 ]; then
@@ -156,6 +168,7 @@ runs:
         echo "[DEBUG_LOG] HAS_FRONTEND_PACKAGE_JSON=$has_frontend_pkg"
         echo "[DEBUG_LOG] HAS_ROOT_GO_MOD=$has_go_mod"
         echo "[DEBUG_LOG] HAS_ROOT_MAIN_GO=$has_main_go"
+        echo "[DEBUG_LOG] HAS_GO_MAIN_PACKAGE=$has_go_main"
         echo "[DEBUG_LOG] HAS_ROOT_CMAKELISTS=$has_cmake"
         echo "[DEBUG_LOG] HAS_ROOT_MKDOCS=$has_mkdocs"
         echo "[DEBUG_LOG] HAS_SUB_NPM=$has_sub_npm"
@@ -166,6 +179,7 @@ runs:
         echo "HAS_FRONTEND_PACKAGE_JSON=$has_frontend_pkg" >> "$GITHUB_OUTPUT"
         echo "HAS_ROOT_GO_MOD=$has_go_mod" >> "$GITHUB_OUTPUT"
         echo "HAS_ROOT_MAIN_GO=$has_main_go" >> "$GITHUB_OUTPUT"
+        echo "HAS_GO_MAIN_PACKAGE=$has_go_main" >> "$GITHUB_OUTPUT"
         echo "HAS_ROOT_CMAKELISTS=$has_cmake" >> "$GITHUB_OUTPUT"
         echo "HAS_ROOT_MKDOCS=$has_mkdocs" >> "$GITHUB_OUTPUT"
         echo "HAS_SUB_NPM=$has_sub_npm" >> "$GITHUB_OUTPUT"
@@ -200,16 +214,27 @@ runs:
         # Wails v3 declares itself in the module — the only marker that
         # separates it from v2 without guessing.
         if ($go_mod_path -ne "" -and (Select-String -Path $go_mod_path -Pattern 'wails/v3' -Quiet -ErrorAction SilentlyContinue)) { $has_wails_v3=1 }
+        # A module producing a command is a different job from a library one.
+        $has_go_main = $has_main_go
+        if ($has_go_main -eq 0) {
+          foreach ($dir in @("cmd", "go/cmd")) {
+            if (Test-Path $dir) {
+              Get-ChildItem -Path $dir -Recurse -Depth 2 -Filter main.go -ErrorAction SilentlyContinue | ForEach-Object { $has_go_main = 1 }
+            }
+          }
+        }
         $suggestion = "unknown"
         if ((($has_go_mod -eq 1) -or ($has_main_go -eq 1)) -and (($has_root_pkg -eq 1) -or ($has_frontend_pkg -eq 1) -or ($has_sub_npm -eq 1))) {
           if ($has_wails_v3 -eq 1) { $suggestion = "wails3" } else { $suggestion = "wails2" }
         }
+        elseif (($has_go_mod -eq 1) -and ($has_go_main -eq 1)) { $suggestion = "go" }
         elseif ($has_go_mod -eq 1) { $suggestion = "core" }
         elseif ($has_cmake -eq 1) { $suggestion = "cpp" }
         Write-Host "[DEBUG_LOG] HAS_ROOT_PACKAGE_JSON=$has_root_pkg"
         Write-Host "[DEBUG_LOG] HAS_FRONTEND_PACKAGE_JSON=$has_frontend_pkg"
         Write-Host "[DEBUG_LOG] HAS_ROOT_GO_MOD=$has_go_mod"
         Write-Host "[DEBUG_LOG] HAS_ROOT_MAIN_GO=$has_main_go"
+        Write-Host "[DEBUG_LOG] HAS_GO_MAIN_PACKAGE=$has_go_main"
         Write-Host "[DEBUG_LOG] HAS_ROOT_CMAKELISTS=$has_cmake"
         Write-Host "[DEBUG_LOG] HAS_ROOT_MKDOCS=$has_mkdocs"
         Write-Host "[DEBUG_LOG] HAS_SUB_NPM=$has_sub_npm"
@@ -219,6 +244,7 @@ runs:
         "HAS_FRONTEND_PACKAGE_JSON=$has_frontend_pkg" >> $Env:GITHUB_OUTPUT
         "HAS_ROOT_GO_MOD=$has_go_mod" >> $Env:GITHUB_OUTPUT
         "HAS_ROOT_MAIN_GO=$has_main_go" >> $Env:GITHUB_OUTPUT
+        "HAS_GO_MAIN_PACKAGE=$has_go_main" >> $Env:GITHUB_OUTPUT
         "HAS_ROOT_CMAKELISTS=$has_cmake" >> $Env:GITHUB_OUTPUT
         "HAS_ROOT_MKDOCS=$has_mkdocs" >> $Env:GITHUB_OUTPUT
         "HAS_SUB_NPM=$has_sub_npm" >> $Env:GITHUB_OUTPUT
@@ -270,6 +296,8 @@ outputs:
     value: ${{ steps.proj_bash.outputs.HAS_ROOT_GO_MOD || steps.proj_pwsh.outputs.HAS_ROOT_GO_MOD }}
   HAS_ROOT_MAIN_GO:
     description: "1 if main.go at root of working-directory"
+  HAS_GO_MAIN_PACKAGE:
+    description: "1 if the module produces a command — main.go at root, or cmd/*/main.go"
     value: ${{ steps.proj_bash.outputs.HAS_ROOT_MAIN_GO || steps.proj_pwsh.outputs.HAS_ROOT_MAIN_GO }}
   HAS_ROOT_CMAKELISTS:
     description: "1 if CMakeLists.txt at root of working-directory"
@@ -284,7 +312,7 @@ outputs:
     description: "1 if a nested mkdocs.yml was found within depth 2"
     value: ${{ steps.proj_bash.outputs.HAS_SUB_MKDOCS || steps.proj_pwsh.outputs.HAS_SUB_MKDOCS }}
   PRIMARY_STACK_SUGGESTION:
-    description: "Computed primary stack suggestion (wails3/wails2/core/cpp/unknown)"
+    description: "Computed primary stack suggestion (wails3/wails2/go/core/cpp/unknown)"
     value: ${{ steps.proj_bash.outputs.PRIMARY_STACK_SUGGESTION || steps.proj_pwsh.outputs.PRIMARY_STACK_SUGGESTION }}
   FOUND_FILES:
     description: "Comma-separated summary of notable files found"
