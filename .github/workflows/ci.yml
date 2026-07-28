@@ -653,7 +653,12 @@ jobs:
         uses: ./
         with:
           build-name: hello-wails
-          build-platform: linux/arm64
+          # The runner's own architecture. Wails v2 on Linux is cgo against
+          # webkit2gtk, so asking an amd64 runner for arm64 hands arm64
+          # assembly to the x86 assembler — this job has never once passed.
+          # Cross-compiling it would need an arm64 toolchain and arm64 webkit
+          # headers, which tests the cross-toolchain rather than the action.
+          build-platform: linux/amd64
           app-working-directory: tdd/wails2-root
           build: true
           package: false
