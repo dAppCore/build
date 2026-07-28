@@ -116,9 +116,21 @@ runs:
         fi
 
         if [ -n "$PLATFORM" ]; then
-          export GOOS="${PLATFORM%%/*}"
-          export GOARCH="${PLATFORM##*/}"
-          echo "[DEBUG_LOG] (go) cross-compiling for $GOOS/$GOARCH"
+          req_os="${PLATFORM%%/*}"
+          req_arch="${PLATFORM##*/}"
+          if [ "$req_arch" = "universal" ]; then
+            # `universal` is a Wails v2 concept: build twice and lipo the
+            # results. Go has no such GOARCH, so honouring it literally fails
+            # with an unhelpful toolchain error. It also happens to be the root
+            # action's default, inherited from when every stack was Wails — so
+            # a Go build that never asked for a platform was getting one it
+            # cannot use.
+            echo "::notice::build-platform '$PLATFORM' has no Go equivalent (universal is a Wails v2 lipo step); building for the runner instead"
+          else
+            export GOOS="$req_os"
+            export GOARCH="$req_arch"
+            echo "[DEBUG_LOG] (go) cross-compiling for $GOOS/$GOARCH"
+          fi
         fi
 
         # Extension follows the target, not the runner: cross-compiling to
