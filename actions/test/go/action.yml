@@ -1,0 +1,206 @@
+name: "Test Go"
+description: >
+  Runs a module's tests, and optionally its coverage and benchmarks.
+
+  Kept apart from the build because they are different questions — "does it
+  compile" and "does it work" fail for different reasons and you want to read
+  them separately. It is also the first of a per-language set, so the shape
+  here is the one the others follow.
+
+inputs:
+  test:
+    description: >
+      `auto` runs the tests when the module has any *_test.go, and says so when
+      it does not. `true` requires them — a module that should have tests and
+      does not is a failure worth surfacing. `false` skips.
+    required: false
+    default: "auto"
+  app-working-directory:
+    description: "Root of the project"
+    required: false
+    default: "."
+  go-directory:
+    description: "Where the module lives, relative to the working directory"
+    required: false
+    default: ""
+  packages:
+    description: "Package pattern to test"
+    required: false
+    default: "./..."
+  build-tags:
+    description: "Comma-separated build tags"
+    required: false
+    default: ""
+  race:
+    description: "Run tests under the race detector"
+    required: false
+    default: "false"
+  timeout:
+    description: "Passed to go test -timeout"
+    required: false
+    default: "10m"
+  coverage:
+    description: "Produce a coverage profile"
+    required: false
+    default: "false"
+  coverage-threshold:
+    description: "Fail below this percentage; 0 does not check"
+    required: false
+    default: "0"
+  codecov:
+    description: "Upload the coverage profile to Codecov. Implies coverage."
+    required: false
+    default: "false"
+  codecov-token:
+    description: "Codecov token. Public repositories can upload without one."
+    required: false
+    default: ""
+  benchmarks:
+    description: "Run benchmarks after the tests"
+    required: false
+    default: "false"
+  benchmark-pattern:
+    description: "Passed to go test -bench"
+    required: false
+    default: "."
+
+outputs:
+  HAS_TESTS:
+    description: "1 if any *_test.go was found"
+    value: ${{ steps.detect.outputs.HAS_TESTS }}
+  TESTS_RUN:
+    description: "1 if the tests were executed"
+    value: ${{ steps.detect.outputs.TESTS_RUN }}
+  COVERAGE:
+    description: "Coverage percentage, when coverage ran"
+    value: ${{ steps.test.outputs.COVERAGE }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Look for tests
+      id: detect
+      shell: bash
+      working-directory: ${{ inputs.app-working-directory }}
+      env:
+        MODE: ${{ inputs.test }}
+        GO_DIR: ${{ inputs.go-directory }}
+      run: |
+        set -euo pipefail
+        go_dir="${GO_DIR:-.}"
+
+        has=0
+        if find "$go_dir" -name '*_test.go' -not -path '*/vendor/*' 2>/dev/null | grep -q .; then
+          has=1
+        fi
+
+        run=0
+        case "$MODE" in
+          false) echo "[DEBUG_LOG] (test/go) disabled" ;;
+          true)
+            if [ "$has" -eq 0 ]; then
+              echo "::error::test: true but the module has no *_test.go"
+              exit 1
+            fi
+            run=1
+            ;;
+          auto|*)
+            if [ "$has" -eq 1 ]; then
+              run=1
+            else
+              # Not a failure — plenty of modules legitimately have none. Said
+              # out loud so a silent skip is never mistaken for a pass.
+              echo "::notice::no *_test.go found; skipping tests"
+            fi
+            ;;
+        esac
+
+        echo "[DEBUG_LOG] (test/go) has_tests=$has run=$run"
+        echo "HAS_TESTS=$has" >> "$GITHUB_OUTPUT"
+        echo "TESTS_RUN=$run" >> "$GITHUB_OUTPUT"
+
+    - name: Test
+      id: test
+      if: steps.detect.outputs.TESTS_RUN == '1'
+      shell: bash
+      working-directory: ${{ inputs.app-working-directory }}
+      env:
+        GO_DIR: ${{ inputs.go-directory }}
+        PACKAGES: ${{ inputs.packages }}
+        TAGS: ${{ inputs.build-tags }}
+        RACE: ${{ inputs.race }}
+        TIMEOUT: ${{ inputs.timeout }}
+        COVERAGE: ${{ inputs.coverage }}
+        CODECOV: ${{ inputs.codecov }}
+        THRESHOLD: ${{ inputs.coverage-threshold }}
+      run: |
+        set -euo pipefail
+        go_dir="${GO_DIR:-.}"
+
+        # Codecov has nothing to upload without a profile, so asking for the
+        # upload asks for the profile.
+        want_cov="$COVERAGE"
+        if [ "$CODECOV" = "true" ]; then want_cov=true; fi
+
+        args=(test "$PACKAGES" -count=1 -timeout "$TIMEOUT")
+        [ "$RACE" = "true" ] && args+=(-race)
+        [ -n "$TAGS" ] && args+=(-tags "$TAGS")
+        if [ "$want_cov" = "true" ]; then
+          args+=(-coverprofile=coverage.out -covermode=atomic)
+        fi
+
+        echo "[DEBUG_LOG] (test/go) cd $go_dir && go ${args[*]}"
+        (cd "$go_dir" && go "${args[@]}")
+
+        if [ "$want_cov" = "true" ]; then
+          COV="$(cd "$go_dir" && go tool cover -func=coverage.out | tail -1 | awk '{print $NF}' | tr -d '%')"
+          echo "[DEBUG_LOG] (test/go) coverage=${COV}%"
+          echo "COVERAGE=$COV" >> "$GITHUB_OUTPUT"
+
+          if [ "$THRESHOLD" != "0" ]; then
+            # awk rather than bash arithmetic: coverage is a decimal.
+            if awk -v c="$COV" -v t="$THRESHOLD" 'BEGIN { exit (c >= t) ? 0 : 1 }'; then
+              echo "[DEBUG_LOG] (test/go) coverage ${COV}% meets the ${THRESHOLD}% floor"
+            else
+              echo "::error::coverage ${COV}% is below the ${THRESHOLD}% floor"
+              exit 1
+            fi
+          fi
+        fi
+
+    - name: Upload coverage to Codecov
+      if: inputs.codecov == 'true' && steps.detect.outputs.TESTS_RUN == '1'
+      uses: codecov/codecov-action@v5
+      with:
+        files: ${{ inputs.app-working-directory }}/${{ inputs.go-directory && format('{0}/', inputs.go-directory) || '' }}coverage.out
+        token: ${{ inputs.codecov-token }}
+        fail_ci_if_error: false
+
+    - name: Benchmarks
+      if: inputs.benchmarks == 'true' && steps.detect.outputs.TESTS_RUN == '1'
+      shell: bash
+      working-directory: ${{ inputs.app-working-directory }}
+      env:
+        GO_DIR: ${{ inputs.go-directory }}
+        PACKAGES: ${{ inputs.packages }}
+        TAGS: ${{ inputs.build-tags }}
+        PATTERN: ${{ inputs.benchmark-pattern }}
+      run: |
+        set -euo pipefail
+        go_dir="${GO_DIR:-.}"
+
+        # -run=^$ so no test runs twice — benchmarks are a separate reading and
+        # a rerun of the suite would only add noise and time.
+        args=(test "$PACKAGES" -run='^$' -bench="$PATTERN" -benchmem)
+        [ -n "$TAGS" ] && args+=(-tags "$TAGS")
+
+        echo "[DEBUG_LOG] (test/go) cd $go_dir && go ${args[*]}"
+        (cd "$go_dir" && go "${args[@]}" | tee benchmarks.txt)
+
+        {
+          echo "### Benchmarks"
+          echo
+          echo '```'
+          grep -E '^(Benchmark|goos|goarch|pkg|cpu)' "$go_dir/benchmarks.txt" || cat "$go_dir/benchmarks.txt"
+          echo '```'
+        } >> "$GITHUB_STEP_SUMMARY"

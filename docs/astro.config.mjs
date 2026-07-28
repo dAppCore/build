@@ -43,6 +43,7 @@ export default defineConfig({
 					label: 'Reference',
 					items: [
 						{ label: 'Inputs', slug: 'reference/inputs' },
+						{ label: 'Tests, coverage & benchmarks', slug: 'reference/testing' },
 						{ label: 'Sub-actions', slug: 'reference/sub-actions' },
 						{ label: 'Packaging & releases', slug: 'reference/packaging' },
 						{ label: 'Code signing', slug: 'reference/signing' },

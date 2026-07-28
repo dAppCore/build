@@ -63,6 +63,34 @@ inputs:
     description: "Where the binary is written"
     required: false
     default: "bin"
+  test:
+    description: "auto runs tests when the module has any; true requires them; false skips"
+    required: false
+    default: "auto"
+  race:
+    description: "Run tests under the race detector"
+    required: false
+    default: "false"
+  coverage:
+    description: "Produce a coverage profile"
+    required: false
+    default: "false"
+  coverage-threshold:
+    description: "Fail below this percentage; 0 does not check"
+    required: false
+    default: "0"
+  codecov:
+    description: "Upload coverage to Codecov. Implies coverage."
+    required: false
+    default: "false"
+  codecov-token:
+    description: "Codecov token. Public repositories can upload without one."
+    required: false
+    default: ""
+  benchmarks:
+    description: "Run benchmarks after the tests"
+    required: false
+    default: "false"
   app-working-directory:
     description: "Root of the project being built"
     required: false
@@ -72,6 +100,9 @@ outputs:
   SELECTED_STACK:
     description: "Always go; lets the orchestrator report what it chose"
     value: "go"
+  COVERAGE:
+    description: "Coverage percentage, when coverage ran"
+    value: ${{ steps.test.outputs.COVERAGE }}
   BINARY_PATH:
     description: "Path to the built binary, relative to the working directory"
     value: ${{ steps.build.outputs.BINARY_PATH }}
@@ -93,6 +124,21 @@ runs:
         go-version: ${{ inputs.go-version }}
         build-cache: ${{ inputs.build-cache }}
         wails-dev-build: 'true'
+
+    - name: Test
+      id: test
+      uses: dAppCore/build/actions/test/go@v4
+      with:
+        test: ${{ inputs.test }}
+        app-working-directory: ${{ inputs.app-working-directory }}
+        go-directory: ${{ inputs.go-directory }}
+        build-tags: ${{ inputs.build-tags }}
+        race: ${{ inputs.race }}
+        coverage: ${{ inputs.coverage }}
+        coverage-threshold: ${{ inputs.coverage-threshold }}
+        codecov: ${{ inputs.codecov }}
+        codecov-token: ${{ inputs.codecov-token }}
+        benchmarks: ${{ inputs.benchmarks }}
 
     - name: Build
       id: build

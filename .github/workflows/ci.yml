@@ -596,6 +596,21 @@ jobs:
           build: true
           package: false
           sign: false
+          # test defaults to auto; asked for explicitly here because the point
+          # of this job is that tests ran, not that they were skipped quietly.
+          test: 'true'
+          coverage: 'true'
+          coverage-threshold: '40'
+          benchmarks: 'true'
+      - name: Assert the tests actually ran and reported coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ steps.go.outputs.COVERAGE }}" != ""
+          echo "[DEBUG_LOG] coverage=${{ steps.go.outputs.COVERAGE }}%"
+          test -f tdd/go-cli/coverage.out
+          test -f tdd/go-cli/benchmarks.txt
+          grep -q "^BenchmarkGreet" tdd/go-cli/benchmarks.txt
       - name: Verify the binary runs
         shell: bash
         working-directory: tdd/go-cli
@@ -621,6 +636,30 @@ jobs:
           # even from Linux.
           ls -la bin/
           if [ "${RUNNER_OS}" = "Linux" ]; then test -f bin/hello-cross.exe; else test -f bin/hello-cross; fi
+
+  # The other half of the contract: a module with no tests is not a failure
+  # under auto, and the skip is announced rather than silent.
+  go-without-tests:
+    name: Go stack on a module with no tests
+    needs: [action-contracts]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build a module that has no *_test.go
+        id: go
+        uses: ./actions/build/go
+        with:
+          build-name: hello-http
+          app-working-directory: tdd/go-http
+          package: false
+          sign: false
+      - name: Assert it detected no tests and built anyway
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f "tdd/go-http/${{ steps.go.outputs.BINARY_PATH }}"
+          echo "[DEBUG_LOG] built without tests, as expected"
+
 
   build-cpp:
     name: Build C++ project (actual compilation) on ${{ matrix.os }}
