@@ -1,0 +1,36 @@
+---
+title: dAppCore/build
+description: One GitHub Action that detects your stack and builds it — Wails v3, Wails v2, and plain Go, on Linux, macOS and Windows.
+template: splash
+hero:
+  tagline: I help on a lot of open source projects, and I was tired of writing the same build workflow over and over.
+  actions:
+    - text: Quickstart
+      link: /build/quickstart/
+      icon: right-arrow
+    - text: On GitHub
+      link: https://github.com/dAppCore/build
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+<CardGrid stagger>
+	<Card title="It reads your repository first" icon="magnifier">
+		Discovery looks at the Go module, the frontend, and the build files, then
+		routes to the stack that matches. You give it a name; it works out the rest.
+	</Card>
+	<Card title="Three platforms, one workflow" icon="laptop">
+		Linux, macOS and Windows runners take the same path. The Linux WebKit
+		packages a Wails v3 build actually needs are installed for you.
+	</Card>
+	<Card title="Composable, not monolithic" icon="puzzle">
+		Every phase — discovery, setup, build, sign, package — is a sub-action you
+		can call on its own when the whole pipeline is more than you want.
+	</Card>
+	<Card title="Tested against real builds" icon="approve-check">
+		Fixtures in the repository compile actual applications on all three
+		runners, so a green badge means something compiled, not that YAML parsed.
+	</Card>
+</CardGrid>

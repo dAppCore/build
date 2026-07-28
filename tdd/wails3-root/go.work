@@ -1,0 +1,9 @@
+go 1.26
+
+// The module lives in go/, so a workspace at the project root is what brings
+// its `tool github.com/wailsapp/wails/v3/cmd/wails3` directive into scope for
+// `go tool wails3` run from here. Without it the CLI is invisible and the
+// build fails with `go: no such tool "wails3"` — which reads like a missing
+// install rather than a missing workspace. lthn/desktop has the same file for
+// the same reason; this fixture is only faithful with it.
+use ./go

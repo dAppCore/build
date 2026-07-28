@@ -1,0 +1,160 @@
+/* ─────────────────────────────────────────────────────────
+   Lethean design pack for Starlight.
+
+   Ported from lthn/desktop's foundations/tokens: the same oklch ramps, the
+   same never-pure-black / never-pure-white rule, the same Lethean brand hue
+   (~195, calibrated so --brand-400 lands on the canonical #40c1c5).
+
+   The tokens are declared once and Starlight's own --sl-* variables are
+   pointed at them, rather than the palette being written twice in two
+   vocabularies. That way a change to the pack moves the site with it.
+
+   Fonts are @fontsource, bundled at build time. No CDN — the desktop app is
+   CSP-clean and offline-capable, and the docs have no reason to be less so.
+   ───────────────────────────────────────────────────────── */
+
+@import '@fontsource/geist/400.css';
+@import '@fontsource/geist/500.css';
+@import '@fontsource/geist/600.css';
+@import '@fontsource/geist/700.css';
+@import '@fontsource/geist-mono/400.css';
+@import '@fontsource/geist-mono/500.css';
+@import '@fontsource/instrument-serif/400-italic.css';
+
+:root {
+	/* Neutrals — ink with a barely-warm cast. Never pure black. */
+	--ink-0: oklch(0.14 0.012 285);
+	--ink-1: oklch(0.18 0.012 285);
+	--ink-2: oklch(0.22 0.013 285);
+	--ink-3: oklch(0.26 0.014 285);
+	--ink-4: oklch(0.32 0.014 285);
+	--ink-5: oklch(0.42 0.012 285);
+	--ink-6: oklch(0.55 0.01 285);
+
+	/* Foreground — paper-soft. Never pure white. */
+	--fg-0: oklch(0.97 0.005 285);
+	--fg-1: oklch(0.88 0.006 285);
+	--fg-2: oklch(0.74 0.008 285);
+	--fg-3: oklch(0.6 0.008 285);
+	--fg-4: oklch(0.48 0.008 285);
+
+	/* Brand — Lethean teal. --brand-400 is the canonical #40c1c5. */
+	--brand-50: oklch(0.97 0.02 195);
+	--brand-100: oklch(0.91 0.038 195);
+	--brand-200: oklch(0.84 0.06 195);
+	--brand-300: oklch(0.78 0.085 195);
+	--brand-400: oklch(0.74 0.105 195);
+	--brand-500: oklch(0.66 0.115 195);
+	--brand-600: oklch(0.56 0.11 195);
+	--brand-700: oklch(0.46 0.09 195);
+	--brand-800: oklch(0.36 0.07 195);
+	--brand-900: oklch(0.26 0.05 195);
+
+	/* States — desaturated for dark-calm. */
+	--success-400: oklch(0.78 0.11 165);
+	--warning-400: oklch(0.82 0.115 78);
+	--danger-400: oklch(0.74 0.14 22);
+	--info-400: oklch(0.78 0.09 230);
+
+	--sl-font: 'Geist', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+	--sl-font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+	/* Starlight's default content column is generous for prose but wide for
+	   the mixed prose-and-YAML this site is mostly made of. */
+	--sl-content-width: 48rem;
+}
+
+/* Dark is the design's home ground: the ramps above are authored for it. */
+:root[data-theme='dark'] {
+	--sl-color-bg: var(--ink-0);
+	--sl-color-bg-nav: var(--ink-1);
+	--sl-color-bg-sidebar: var(--ink-0);
+	--sl-color-bg-inline-code: var(--ink-3);
+
+	--sl-color-white: var(--fg-0);
+	--sl-color-gray-1: var(--fg-1);
+	--sl-color-gray-2: var(--fg-2);
+	--sl-color-gray-3: var(--fg-3);
+	--sl-color-gray-4: var(--ink-6);
+	--sl-color-gray-5: var(--ink-4);
+	--sl-color-gray-6: var(--ink-2);
+	--sl-color-gray-7: var(--ink-3);
+	--sl-color-black: var(--ink-0);
+
+	--sl-color-accent: var(--brand-500);
+	--sl-color-accent-low: var(--brand-800);
+	--sl-color-accent-high: var(--brand-300);
+	--sl-color-text-accent: var(--brand-300);
+
+	--sl-color-hairline: color-mix(in oklch, var(--fg-0) 8%, transparent);
+	--sl-color-hairline-light: color-mix(in oklch, var(--fg-0) 14%, transparent);
+	--sl-color-hairline-shade: var(--ink-2);
+
+	--sl-color-green: var(--success-400);
+	--sl-color-orange: var(--warning-400);
+	--sl-color-red: var(--danger-400);
+	--sl-color-blue: var(--info-400);
+	--sl-color-purple: var(--brand-400);
+}
+
+/* Light is not an inversion of dark. The neutrals lift to a warm off-white
+   and the brand darkens, because teal at --brand-400 on white fails contrast
+   for body-sized text. */
+:root[data-theme='light'] {
+	--sl-color-bg: oklch(0.99 0.003 285);
+	--sl-color-bg-nav: oklch(0.97 0.004 285);
+	--sl-color-bg-sidebar: oklch(0.98 0.003 285);
+	--sl-color-bg-inline-code: oklch(0.94 0.006 285);
+
+	--sl-color-black: oklch(0.99 0.003 285);
+	--sl-color-white: oklch(0.21 0.012 285);
+	--sl-color-gray-1: oklch(0.27 0.012 285);
+	--sl-color-gray-2: oklch(0.36 0.012 285);
+	--sl-color-gray-3: oklch(0.48 0.01 285);
+	--sl-color-gray-4: oklch(0.6 0.009 285);
+	--sl-color-gray-5: oklch(0.83 0.006 285);
+	--sl-color-gray-6: oklch(0.93 0.005 285);
+	--sl-color-gray-7: oklch(0.96 0.004 285);
+
+	--sl-color-accent: var(--brand-700);
+	--sl-color-accent-low: var(--brand-100);
+	--sl-color-accent-high: var(--brand-800);
+	--sl-color-text-accent: var(--brand-700);
+
+	--sl-color-hairline: color-mix(in oklch, oklch(0.21 0.012 285) 10%, transparent);
+	--sl-color-hairline-light: color-mix(in oklch, oklch(0.21 0.012 285) 16%, transparent);
+
+	--sl-color-green: oklch(0.5 0.11 165);
+	--sl-color-orange: oklch(0.58 0.13 70);
+	--sl-color-red: oklch(0.52 0.16 22);
+	--sl-color-blue: oklch(0.52 0.12 230);
+	--sl-color-purple: var(--brand-700);
+}
+
+/* The one editorial note in an otherwise utilitarian type system: the splash
+   tagline, in Instrument Serif italic. Used once, on the front page. */
+.hero .tagline {
+	font-family: 'Instrument Serif', Georgia, serif;
+	font-style: italic;
+	font-size: var(--sl-text-2xl);
+	line-height: 1.35;
+	color: var(--sl-color-gray-2);
+}
+
+.site-title {
+	font-weight: 600;
+	letter-spacing: -0.01em;
+}
+
+/* Long YAML samples are the bulk of this site; give them room to scroll
+   rather than letting them widen the page. */
+.expressive-code .frame pre,
+.sl-markdown-content pre {
+	overflow-x: auto;
+}
+
+.sl-markdown-content table {
+	display: block;
+	overflow-x: auto;
+	font-variant-numeric: tabular-nums;
+}

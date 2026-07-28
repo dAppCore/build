@@ -1,0 +1,21 @@
+{
+  "name": "dappcore-build-docs",
+  "type": "module",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "^0.41.5",
+    "@fontsource/geist": "^5.2.8",
+    "@fontsource/geist-mono": "^5.2.8",
+    "@fontsource/instrument-serif": "^5.2.8",
+    "astro": "^7.1.4",
+    "sharp": "^0.34.5"
+  }
+}
