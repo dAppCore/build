@@ -95,6 +95,18 @@ inputs:
     description: "Base name for release assets, before the -<os>-<arch> suffix"
     required: false
     default: ""
+  deb:
+    description: "Attach a .deb to the release. Linux runners only."
+    required: false
+    default: "false"
+  deb-maintainer:
+    description: "Debian Maintainer field, as `Name <email>`"
+    required: false
+    default: ""
+  deb-description:
+    description: "One-line package summary"
+    required: false
+    default: ""
   app-working-directory:
     description: "Root of the project being built"
     required: false
@@ -178,3 +190,6 @@ runs:
         is-tag: ${{ steps.discovery.outputs.IS_TAG }}
         short-sha: ${{ steps.discovery.outputs.SHORT_SHA }}
         release-asset-prefix: ${{ inputs.release-asset-prefix }}
+        deb: ${{ inputs.deb }}
+        deb-maintainer: ${{ inputs.deb-maintainer }}
+        deb-description: ${{ inputs.deb-description }}

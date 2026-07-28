@@ -63,6 +63,20 @@ inputs:
     description: "Base name for release assets, before the -<os>-<arch> suffix"
     required: false
     default: ""
+  deb:
+    description: >
+      Attach a .deb to the release. Linux runners only, and only on a tag.
+      Currently wired for the Go stack; other stacks ignore it.
+    required: false
+    default: "false"
+  deb-maintainer:
+    description: "Debian Maintainer field, as `Name <email>`. Defaults to the repository."
+    required: false
+    default: ""
+  deb-description:
+    description: "One-line package summary. Defaults to the build name."
+    required: false
+    default: ""
   go-directory:
     description: "Where the Go module lives, relative to the working directory"
     required: false
@@ -105,6 +119,9 @@ runs:
         app-working-directory: ${{ inputs.app-working-directory }}
         go-directory: ${{ inputs.go-directory }}
         release-asset-prefix: ${{ inputs.release-asset-prefix }}
+        deb: ${{ inputs.deb }}
+        deb-maintainer: ${{ inputs.deb-maintainer }}
+        deb-description: ${{ inputs.deb-description }}
         main-package: ${{ inputs.main-package }}
         build-tags: ${{ inputs.build-tags }}
         ldflags: ${{ inputs.ldflags }}
