@@ -7,3 +7,6 @@ build/wails2/frontend/dist
 tdd/.build/
 tdd/**/node_modules/
 tdd/tdd/
+
+# fixture build output
+tdd/wails3-root/bin/

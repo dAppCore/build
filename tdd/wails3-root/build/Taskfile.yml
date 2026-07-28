@@ -1,0 +1,11 @@
+version: "3"
+
+tasks:
+  build:frontend:
+    summary: Stages the frontend into the directory the Go binary embeds
+    internal: true
+    cmds:
+      # A real project runs its bundler here. The fixture copies, so the build
+      # keeps the same two-stage shape — frontend first, then Go — without
+      # requiring a node toolchain on the runner.
+      - cp frontend-ng/index.html "{{.GO_DIR}}/assets/index.html"

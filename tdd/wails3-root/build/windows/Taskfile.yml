@@ -1,0 +1,17 @@
+version: "3"
+
+includes:
+  common: ../Taskfile.yml
+
+tasks:
+  build:
+    summary: Builds the application for Uwindows
+    deps:
+      - task: common:build:frontend
+    cmds:
+      - cd "{{.GO_DIR}}" && go build -buildvcs=false -o "../{{.BIN_DIR}}/{{.APP_NAME}}.exe" "{{.GO_CMD}}"
+
+  package:
+    summary: Alias for build — the fixture ships no installer
+    cmds:
+      - task: build

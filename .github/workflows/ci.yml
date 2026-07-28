@@ -538,3 +538,35 @@ jobs:
           sign: false
       - name: Verify binary
         run: test -f tdd/wails2-root/build/bin/hello-wails
+
+  # Until this job existed, every wails3 reference in CI was a discovery
+  # assertion: the stack was detected, routed to and tagged, with nothing
+  # showing it could compile anything. The fixture links wails/v3's application
+  # package, so this exercises the real cgo and webview toolchain — on Linux
+  # that is GTK4 and webkitgtk-6.0, which is precisely where the stack is
+  # easiest to get wrong.
+  build-wails3:
+    name: Build Wails3 project (actual compilation) on ${{ matrix.os }}
+    needs: [setup-go-tests, setup-npm-tests]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, binary: 'bin/wails3-fixture' }
+          - { os: macos-latest, binary: 'bin/wails3-fixture' }
+          - { os: windows-latest, binary: 'bin/wails3-fixture.exe' }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build with the wails3 stack
+        uses: ./actions/build/wails3
+        with:
+          build-name: wails3-fixture
+          app-working-directory: tdd/wails3-root
+          npm-working-directory: tdd/wails3-root/frontend-ng
+          build: true
+          package: false
+          sign: false
+      - name: Verify binary
+        shell: bash
+        run: test -f "tdd/wails3-root/${{ matrix.binary }}"

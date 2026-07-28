@@ -1,9 +1,19 @@
 version: "3"
 
+# A Wails v3 project in the shape the real ones take: the Go module one
+# directory down, the frontend beside it, and the build described by Taskfile
+# targets rather than CLI flags. dAppCore/build's wails3 stack runs the
+# project's own target, so this file is what CI actually exercises.
+
 includes:
+  common: ./build/Taskfile.yml
   darwin: ./build/darwin/Taskfile.yml
   linux: ./build/linux/Taskfile.yml
   windows: ./build/windows/Taskfile.yml
 
 vars:
+  APP_NAME: "wails3-fixture"
+  BIN_DIR: "bin"
+  GO_DIR: "go"
+  GO_CMD: "."
   WAILS3_TOOL: '{{.WAILS3_TOOL | default "go tool wails3"}}'
