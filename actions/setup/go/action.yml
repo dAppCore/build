@@ -57,4 +57,3 @@ runs:
       if: inputs.install-wails == 'true' && inputs.wails-dev-build == 'false'
       run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ inputs.wails-version }}
       shell: bash
-      shell: bash

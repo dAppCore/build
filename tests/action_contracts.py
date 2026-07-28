@@ -12,6 +12,31 @@ import sys
 
 import yaml
 
+
+class StrictLoader(yaml.SafeLoader):
+    """SafeLoader that refuses duplicate keys.
+
+    PyYAML takes the last one and says nothing; the Actions runner rejects the
+    manifest. So a file can validate here, look fine, and fail every job that
+    touches it — which is exactly what a stray `shell: bash` left behind by an
+    edit did.
+    """
+
+
+def _no_duplicates(loader, node, deep=False):
+    seen = set()
+    for key_node, _ in node.value:
+        key = loader.construct_object(key_node, deep=deep)
+        if key in seen:
+            raise yaml.constructor.ConstructorError(
+                None, None, f"duplicate key {key!r}", key_node.start_mark)
+        seen.add(key)
+    return yaml.SafeLoader.construct_mapping(loader, node, deep)
+
+
+StrictLoader.add_constructor(
+    yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _no_duplicates)
+
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 
@@ -25,7 +50,11 @@ def main() -> int:
 
     for path in action_files():
         rel = path.relative_to(ROOT)
-        doc = yaml.safe_load(path.read_text()) or {}
+        try:
+            doc = yaml.load(path.read_text(), Loader=StrictLoader) or {}
+        except yaml.YAMLError as exc:
+            problems.append(f"{rel}: {exc}")
+            continue
 
         # An output declared without a value resolves to "" forever. Nothing
         # warns; the consumer just sees empty. This is how HAS_ROOT_MAIN_GO
