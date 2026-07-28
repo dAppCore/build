@@ -1,0 +1,42 @@
+# Dependency-bump issue tracker — Core ecosystem Go repos.
+# Copy to .github/workflows/deps.yml in each repo.
+#
+# Opens/updates a single 'deps'-labelled issue listing dappco.re/* dependencies
+# that have a newer published release (and closes it when all are current). Open
+# 'deps' issues across every repo then ARE the ecosystem's version-bump work
+# queue — filter by the label to see exactly what's outstanding.
+#
+# Triggers:
+#   - schedule            → daily safety-net poll
+#   - workflow_dispatch   → run on demand (set dry-run to preview the issue body)
+#   - repository_dispatch → an upstream release can ping {"event_type":"dep-bump"}
+name: Deps
+
+on:
+  schedule:
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: "Preview the issue body without touching issues"
+        type: boolean
+        default: false
+  repository_dispatch:
+    types: [dep-bump]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  deps:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dAppCore/build/actions/deps@dev
+        with:
+          go-mod-dir: go
+          dry-run: ${{ github.event.inputs.dry-run || 'false' }}

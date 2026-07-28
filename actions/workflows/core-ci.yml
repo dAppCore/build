@@ -3,7 +3,7 @@
 #
 # Triggers:
 #   - Push to main/dev → full test
-#   - PR → test + CodeRabbit auto-fix on failure
+#   - PR to main       → full test
 #
 name: CI
 
@@ -12,12 +12,9 @@ on:
     branches: [main, dev]
   pull_request:
     branches: [main]
-  pull_request_review:
-    types: [submitted]
 
 jobs:
   test:
-    if: github.event_name != 'pull_request_review'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,41 +23,3 @@ jobs:
         with:
           go-version: "1.26"
           run-vet: "true"
-
-  # Auto-fix when CodeRabbit requests changes
-  auto-fix:
-    if: >
-      github.event_name == 'pull_request_review' &&
-      github.event.review.user.login == 'coderabbitai' &&
-      github.event.review.state == 'changes_requested'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.ref }}
-          fetch-depth: 0
-
-      - uses: dAppCore/build/actions/fix@dev
-        with:
-          go-version: "1.26"
-
-  # Auto-merge when CodeRabbit approves
-  auto-merge:
-    if: >
-      github.event_name == 'pull_request_review' &&
-      github.event.review.user.login == 'coderabbitai' &&
-      github.event.review.state == 'approved'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Merge PR
-        run: gh pr merge ${{ github.event.pull_request.number }} --merge --delete-branch
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,6 +1,6 @@
-# host-uk/build@v4
+# dAppCore/build@v4
 
-[![CI](https://github.com/snider/wails-build-action/actions/workflows/ci.yml/badge.svg)](https://github.com/snider/wails-build-action/actions/workflows/ci.yml)
+[![CI](https://github.com/dAppCore/build/actions/workflows/ci.yml/badge.svg)](https://github.com/dAppCore/build/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-EUPL-green.svg)](LICENSE)
 
 > [!NOTE]
@@ -19,7 +19,7 @@ you should write out an action that cherry-picks the parts you need; the auto-de
 
 # Default build
 ```yaml
-- uses: host-uk/build@v4
+- uses: dAppCore/build@v4
   with:
     build-name: wailsApp
     build-platform: linux/amd64
@@ -28,7 +28,7 @@ you should write out an action that cherry-picks the parts you need; the auto-de
 ## Build with No uploading
 
 ```yaml
-- uses: host-uk/build@v4
+- uses: dAppCore/build@v4
   with:
     build-name: wailsApp
     build-platform: linux/amd64
@@ -36,7 +36,7 @@ you should write out an action that cherry-picks the parts you need; the auto-de
 ```
 ## Inputs (high level)
 
-This repository is multi-stack. The root action currently runs the Wails v2 pipeline by default. For full Wails-specific inputs and examples, see `actions/build/wails2/README.md`.
+This repository is multi-stack. The root action detects the stack and delegates; Wails v2 is the fallback when detection finds nothing it recognises. For stack-specific inputs and examples, see the wrapper README beside each stack.
 
 Common high-level inputs on the root action include:
 - `build-name` — required; base name for outputs
@@ -90,7 +90,7 @@ jobs:
       DENO_BUILD: 'deno task build'
     steps:
       - uses: actions/checkout@v4
-      - uses: host-uk/build@v4
+      - uses: dAppCore/build@v4
         with:
           build-name: wailsApp
           build-platform: linux/amd64
@@ -104,7 +104,7 @@ Using `$GITHUB_ENV` in a prior step:
     echo "DENO_VERSION=v1.44.x" >> "$GITHUB_ENV"
     echo "DENO_WORKDIR=frontend" >> "$GITHUB_ENV"
     echo "DENO_BUILD=deno task build" >> "$GITHUB_ENV"
-- uses: host-uk/build@v4
+- uses: dAppCore/build@v4
   with:
     build-name: wailsApp
     build-platform: linux/amd64
@@ -129,16 +129,53 @@ This repo is modular. You can call the root action, the Wails v2 wrapper, or any
   - actions/setup/deno — optional; ENV-first Deno setup and command runner.
   - actions/setup/conan — placeholder for future C++ builds.
 - actions/build/wails2/build — runs `wails build` and fixes executable permissions per-OS.
+- actions/build/wails3/build — runs the project's Taskfile target through `go tool wails3` and fixes executable permissions per-OS.
 - actions/sign — unified macOS and Windows signing; notarizes on tags.
 - actions/package — uploads artifacts; on tags, publishes a GitHub Release.
 
 ## Stacks
 
 - Available:
-  - wails2 — `uses: host-uk/build/actions/build/wails2@v3` (or just call the root action)
+  - **wails3** — `uses: dAppCore/build/actions/build/wails3@v4`
+  - **wails2** — `uses: dAppCore/build/actions/build/wails2@v4`
+  - **core** — plain Go binaries, no frontend
 - Coming soon:
-  - wails3 — once upstream stabilizes
   - cpp — via `setup/conan` and dedicated build/sign/pack steps
+
+### wails2 or wails3?
+
+Detection reads the Go module, because that is the only place the two differ
+unambiguously — both are Go plus a frontend. A module requiring `wails/v3`
+selects the v3 stack; anything else with Go and a frontend selects v2. The
+module is found at `go.mod` or `go/go.mod`, since keeping it one level down is
+a normal layout rather than an exception.
+
+The stacks are not variations on each other. v2 takes build options as CLI
+flags this action composes. v3 projects own a Taskfile, and wails3 runs targets
+in it — so the v3 stack runs the project's own target rather than
+reconstructing the command, and CI takes the same path a developer does. That
+is why the v3 stack has no `build-platform` input: the Taskfile target and the
+runner decide together, and offering a platform would be offering a choice the
+stack cannot honour.
+
+```yaml
+# wails3 — the Taskfile decides how; the runner decides which target
+- uses: dAppCore/build@v4
+  with:
+    build-name: myApp
+
+# wails3, explicit target
+- uses: dAppCore/build/actions/build/wails3@v4
+  with:
+    build-name: myApp
+    task: linux:package
+```
+
+Linux runners get `libgtk-4-dev` and `libwebkitgtk-6.0-dev`. Wails v3 compiles
+its GTK4 path unless the `gtk3` build tag is set, and installing the GTK3 pair
+instead fails as `Package 'gtk4', required by 'virtual:world', not found` —
+often at binding generation rather than at build, which reads as a frontend
+problem.
 
 ## Setup orchestrator notes
 
@@ -146,7 +183,7 @@ The `actions/setup` sub-action is a thin orchestrator that runs Go → npm → D
 
 ## Orchestrator controls (root action)
 
-The root action can auto-detect your stack and auto-enable setup steps. This makes `host-uk/build@v4` “just work” for common layouts, while still allowing full control.
+The root action can auto-detect your stack and auto-enable setup steps. This makes `dAppCore/build@v4` “just work” for common layouts, while still allowing full control.
 
 - Inputs (root action):
   - `AUTO_STACK` (default `true`) — auto-select a stack based on `actions/discovery` outputs.
@@ -188,7 +225,7 @@ The repository includes self-tests to surface issues early and gate app builds b
 
 These checks run on `push`/`pull_request` to branches and are safe on forks (no secrets required). On tag refs, real releases are only created when your workflow explicitly runs and `refs/tags/*` is detected.
 
-### Extending CI for new stacks (wails3/cpp)
+### Extending CI for new stacks (cpp)
 - Mirror the pattern: create stack-specific sub-action tests (e.g., `setup/wails3`, `setup/conan`, stack-specific build options) that are fast and deterministic.
 - Add the new test jobs to the app build job `needs:` so stack builds only run after sub-tests pass.
 - Prefer dummy artifacts with the `actions/package` sub-action for packaging checks; keep releases tag-gated.

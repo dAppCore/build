@@ -1,0 +1,122 @@
+name: "Wails v3 (full pipeline)"
+description: >
+  Discovery, toolchains, Linux WebKit, build, sign and package for a Wails v3
+  application.
+
+  The difference from the v2 stack is where the build is described. v2 takes
+  its options as flags this action composes; v3 projects own a Taskfile and
+  wails3 runs targets in it, so this pipeline runs the project's own target
+  rather than reconstructing the command. CI and a developer's machine then
+  take the same path, and a build that works locally is not a different build
+  in CI.
+
+inputs:
+  build:
+    description: "Whether to run the build"
+    required: false
+    default: "true"
+  sign:
+    description: "Sign the build (macOS/Windows)"
+    required: false
+    default: "false"
+  package:
+    description: "Upload artifacts and release on tag"
+    required: false
+    default: "true"
+  build-name:
+    description: "The name of the binary/app bundle"
+    required: true
+  build-cache:
+    description: "Enable Go cache"
+    required: false
+    default: "true"
+  app-working-directory:
+    description: "Root of the app being built"
+    required: false
+    default: "."
+  task:
+    description: "Taskfile target; defaults to <os>:build from the runner"
+    required: false
+    default: ""
+  wails3-tool:
+    description: "How to invoke wails3; defaults to the module-pinned `go tool wails3`"
+    required: false
+    default: "go tool wails3"
+  go-version:
+    description: "Go version"
+    required: false
+    default: "1.26"
+  node-version:
+    description: "Node version for the frontend toolchain"
+    required: false
+    default: "22"
+  npm-working-directory:
+    description: "Where the frontend package.json lives"
+    required: false
+    default: "."
+
+outputs:
+  SELECTED_STACK:
+    description: "Always wails3; lets the orchestrator report what it chose"
+    value: "wails3"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Discovery
+      id: discovery
+      uses: dAppCore/build/actions/discovery@v4
+      with:
+        working-directory: ${{ inputs.app-working-directory }}
+
+    # wails v3 compiles its GTK4 path unless the `gtk3` build tag is set, so a
+    # Linux runner needs gtk4 and webkitgtk-6.0. Installing the GTK3 pair
+    # instead fails as "Package 'gtk4', required by 'virtual:world', not found"
+    # — and it fails at binding generation, not at build, which reads as a
+    # frontend problem.
+    - name: Linux WebKit dependencies
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        set -euo pipefail
+        sudo apt-get update
+        sudo apt-get install -y \
+          libgtk-4-dev libwebkitgtk-6.0-dev pkg-config build-essential
+
+    - name: Setup toolchains (Go/Node)
+      uses: dAppCore/build/actions/setup@v4
+      with:
+        go-version: ${{ inputs.go-version }}
+        build-cache: ${{ inputs.build-cache }}
+        node-version: ${{ inputs.node-version }}
+        npm-working-directory: ${{ inputs.npm-working-directory }}
+        npm-install: 'true'
+
+    - name: Build the Wails v3 app
+      id: build
+      uses: dAppCore/build/actions/build/wails3/build@v4
+      with:
+        build: ${{ inputs.build }}
+        app-working-directory: ${{ inputs.app-working-directory }}
+        build-name: ${{ inputs.build-name }}
+        task: ${{ inputs.task }}
+        wails3-tool: ${{ inputs.wails3-tool }}
+
+    - name: Sign artifacts (OS-conditional)
+      uses: dAppCore/build/actions/sign@v4
+      with:
+        sign: ${{ inputs.sign }}
+        app-working-directory: ${{ inputs.app-working-directory }}
+        build-name: ${{ inputs.build-name }}
+
+    - name: Package & release
+      uses: dAppCore/build/actions/package@v4
+      with:
+        package: ${{ inputs.package }}
+        build-name: ${{ inputs.build-name }}
+        os: ${{ steps.discovery.outputs.OS }}
+        arch: ${{ steps.discovery.outputs.ARCH }}
+        tag: ${{ steps.discovery.outputs.TAG }}
+        is-tag: ${{ steps.discovery.outputs.IS_TAG }}
+        short-sha: ${{ steps.discovery.outputs.SHORT_SHA }}
+        ref: ${{ steps.discovery.outputs.REF }}

@@ -1,0 +1,20 @@
+# gate/release.yml — the RELEASE juncture (dappcore/devops/build).
+#
+# Runs on a git tag: build the downloadable release artifacts. Kept off the
+# per-commit path on purpose — tag a commit to cut a release.
+#
+# USE — in a repo's .gitlab-ci.yml:
+#   include:
+#     - { project: 'dappcore/devops/build', file: '/gate/release.yml', ref: dev }
+#   package:
+#     extends: .gate-release
+#     script: [ make release ]
+#     artifacts: { paths: [ build/bin/ ], expire_in: 1 week }
+stages: [lint, test, build, release]
+
+.gate-release:
+  stage: release
+  tags: [homelab]
+  interruptible: true
+  rules:
+    - if: '$CI_COMMIT_TAG'

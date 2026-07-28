@@ -1,0 +1,118 @@
+name: "Deps — dappco.re bump tracker"
+description: >
+  Detect dappco.re/* dependencies that have a newer published release and
+  open/update (or close) a single tracking issue — turning the dependency
+  graph into the ecosystem's version-bump work queue. Open issues carrying the
+  'deps' label across every repo ARE the list of bumps to apply.
+inputs:
+  go-mod-dir:
+    description: "Directory containing go.mod (Core repos use the 'go' subdir; falls back to the repo root)."
+    required: false
+    default: "go"
+  label:
+    description: "Issue label used to find/track the single bump issue."
+    required: false
+    default: "deps"
+  title:
+    description: "Exact title of the tracking issue — the idempotency key (one open issue per repo)."
+    required: false
+    default: "chore(deps): dappco.re bumps available"
+  proxy:
+    description: "Go module proxy base URL used to resolve the latest published version."
+    required: false
+    default: "https://proxy.golang.org"
+  dry-run:
+    description: "When 'true', print the computed issue title/body instead of touching GitHub issues (no token needed)."
+    required: false
+    default: "false"
+runs:
+  using: "composite"
+  steps:
+    - name: Detect stale dappco.re deps and open/update the tracking issue
+      id: detect
+      shell: bash
+      run: |
+        set -uo pipefail
+        DIR='${{ inputs.go-mod-dir }}'
+        LABEL='${{ inputs.label }}'
+        TITLE='${{ inputs.title }}'
+        PROXY='${{ inputs.proxy }}'
+        DRY='${{ inputs.dry-run }}'
+        MARKER='<!-- deps-bump-tracker -->'
+
+        GOMOD="$DIR/go.mod"
+        [ -f "$GOMOD" ] || GOMOD="go.mod"
+        if [ ! -f "$GOMOD" ]; then
+          echo "[DEBUG_LOG] no go.mod found (looked in $DIR/ and repo root) — nothing to do"
+          echo "stale-count=0" >> "$GITHUB_OUTPUT"; exit 0
+        fi
+        echo "[DEBUG_LOG] scanning $GOMOD for direct dappco.re/* deps"
+
+        # Direct dappco.re/* requires only (drop the module line + // indirect).
+        deps=$(grep -E 'dappco\.re/[^[:space:]]+[[:space:]]+v[0-9]' "$GOMOD" \
+                 | grep -v '// indirect' \
+                 | grep -oE 'dappco\.re/[^[:space:]]+[[:space:]]+v[0-9]+\.[0-9]+\.[0-9]+' \
+                 | sort -u)
+
+        stale=""; n=0
+        while read -r mod cur; do
+          [ -n "$mod" ] || continue
+          # Highest STABLE published version (@v/list is robust vs @latest's lag).
+          latest=$(curl -fsS --max-time 15 "${PROXY}/${mod}/@v/list" 2>/dev/null \
+                     | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
+          if [ -z "$latest" ]; then
+            echo "[DEBUG_LOG] $mod: no published versions on proxy, skipping"; continue
+          fi
+          if [ "$latest" != "$cur" ] && [ "$(printf '%s\n%s\n' "$cur" "$latest" | sort -V | tail -1)" = "$latest" ]; then
+            echo "[DEBUG_LOG] STALE $mod $cur -> $latest"
+            stale="${stale}- [ ] \`${mod}\` \`${cur}\` → \`${latest}\`"$'\n'
+            n=$((n+1))
+          else
+            echo "[DEBUG_LOG] ok    $mod $cur"
+          fi
+        done <<< "$deps"
+
+        echo "stale-count=$n" >> "$GITHUB_OUTPUT"
+
+        # All current → close the tracker if one is open, then stop.
+        if [ "$n" -eq 0 ]; then
+          echo "[DEBUG_LOG] all dappco.re deps current"
+          if [ "$DRY" = "true" ]; then echo "(dry-run) would close any open '$TITLE' issue"; exit 0; fi
+          num=$(gh issue list --state open --limit 200 --json number,title \
+                  --jq ".[] | select(.title==\"$TITLE\") | .number" 2>/dev/null | head -1)
+          if [ -n "$num" ]; then
+            gh issue close "$num" --comment "✅ All \`dappco.re/*\` deps current — closing the bump tracker."
+            echo "[DEBUG_LOG] closed #$num"
+          fi
+          exit 0
+        fi
+
+        body="Upstream \`dappco.re/*\` releases newer than this repo's pins. Bump → PR → merge:"$'\n\n'"${stale}"$'\n'"${MARKER}"
+
+        if [ "$DRY" = "true" ]; then
+          echo "----- (dry-run) issue title -----"; printf '%s\n' "$TITLE"
+          echo "----- (dry-run) issue body ------"; printf '%s\n' "$body"
+          echo "---------------------------------"
+          exit 0
+        fi
+
+        # Idempotent: one open issue matched by exact title. Update it, else create it.
+        num=$(gh issue list --state open --limit 200 --json number,title \
+                --jq ".[] | select(.title==\"$TITLE\") | .number" 2>/dev/null | head -1)
+        if [ -n "$num" ]; then
+          gh issue edit "$num" --body "$body" >/dev/null
+          echo "[DEBUG_LOG] updated #$num ($n bump(s))"
+        else
+          gh label create "$LABEL" --color 0e8a16 --description "Upstream dappco.re version bumps to apply" >/dev/null 2>&1 || true
+          url=$(gh issue create --title "$TITLE" --label "$LABEL" --body "$body" 2>/dev/null)
+          num=$(printf '%s' "$url" | grep -oE '[0-9]+$')
+          echo "[DEBUG_LOG] created #$num ($n bump(s)) — $url"
+        fi
+        echo "issue=$num" >> "$GITHUB_OUTPUT"
+outputs:
+  stale-count:
+    description: "Number of dappco.re deps with a newer published release (0 = all current)."
+    value: ${{ steps.detect.outputs.stale-count }}
+  issue:
+    description: "Issue number of the tracking issue when one was opened or updated."
+    value: ${{ steps.detect.outputs.issue }}

@@ -114,11 +114,17 @@ runs:
         set -euo pipefail
         echo "[DEBUG_LOG] Discovery scanning working dir: $PWD"
         has_root_pkg=0; has_frontend_pkg=0; has_go_mod=0; has_main_go=0; has_cmake=0; has_mkdocs=0
-        has_sub_npm=0; has_sub_mkdocs=0
+        has_sub_npm=0; has_sub_mkdocs=0; has_wails_v3=0; go_mod_path=""
         found_files=()
         # Root markers
         if [ -f "package.json" ]; then has_root_pkg=1; found_files+=("package.json"); fi
-        if [ -f "go.mod" ]; then has_go_mod=1; found_files+=("go.mod"); fi
+        if [ -f "go.mod" ]; then has_go_mod=1; go_mod_path="go.mod"; found_files+=("go.mod"); fi
+        # A Go module one level down is a normal layout, not an exception: the
+        # module sits in go/ so the repository root can hold the frontend and
+        # the build files. Missing it reads the project as "no Go at all".
+        if [ "$has_go_mod" -eq 0 ] && [ -f "go/go.mod" ]; then
+          has_go_mod=1; go_mod_path="go/go.mod"; found_files+=("go/go.mod")
+        fi
         if [ -f "main.go" ]; then has_main_go=1; found_files+=("main.go"); fi
         if [ -f "CMakeLists.txt" ]; then has_cmake=1; found_files+=("CMakeLists.txt"); fi
         if [ -f "mkdocs.yml" ]; then has_mkdocs=1; found_files+=("mkdocs.yml"); fi
@@ -129,10 +135,17 @@ runs:
           if find . -maxdepth 2 -mindepth 2 -name package.json | grep -q .; then has_sub_npm=1; fi
           if find . -maxdepth 2 -mindepth 1 -name mkdocs.yml | grep -q .; then has_sub_mkdocs=1; fi
         fi
+        # Wails v3 declares itself in the module. That is the only marker that
+        # separates it from v2 without guessing: both are Go plus a frontend,
+        # and the two build through entirely different tooling — v2 by CLI
+        # flags, v3 by Taskfile targets.
+        if [ -n "$go_mod_path" ] && grep -qE 'wails/v3' "$go_mod_path" 2>/dev/null; then
+          has_wails_v3=1
+        fi
         # Suggest stack
         suggestion="unknown"
         if { [ "$has_go_mod" -eq 1 ] || [ "$has_main_go" -eq 1 ]; } && { [ "$has_root_pkg" -eq 1 ] || [ "$has_frontend_pkg" -eq 1 ] || [ "$has_sub_npm" -eq 1 ]; }; then
-          suggestion="wails2"
+          if [ "$has_wails_v3" -eq 1 ]; then suggestion="wails3"; else suggestion="wails2"; fi
         elif [ "$has_go_mod" -eq 1 ]; then
           suggestion="core"
         elif [ "$has_cmake" -eq 1 ]; then
@@ -147,6 +160,7 @@ runs:
         echo "[DEBUG_LOG] HAS_ROOT_MKDOCS=$has_mkdocs"
         echo "[DEBUG_LOG] HAS_SUB_NPM=$has_sub_npm"
         echo "[DEBUG_LOG] HAS_SUB_MKDOCS=$has_sub_mkdocs"
+        echo "[DEBUG_LOG] HAS_WAILS_V3=$has_wails_v3 (go.mod: ${go_mod_path:-none})"
         echo "[DEBUG_LOG] PRIMARY_STACK_SUGGESTION=$suggestion"
         echo "HAS_ROOT_PACKAGE_JSON=$has_root_pkg" >> "$GITHUB_OUTPUT"
         echo "HAS_FRONTEND_PACKAGE_JSON=$has_frontend_pkg" >> "$GITHUB_OUTPUT"
@@ -170,10 +184,12 @@ runs:
       run: |
         Write-Host "[DEBUG_LOG] Discovery scanning working dir: $PWD"
         $has_root_pkg=0; $has_frontend_pkg=0; $has_go_mod=0; $has_main_go=0; $has_cmake=0; $has_mkdocs=0
-        $has_sub_npm=0; $has_sub_mkdocs=0
+        $has_sub_npm=0; $has_sub_mkdocs=0; $has_wails_v3=0; $go_mod_path=""
         $found = @()
         if (Test-Path package.json) { $has_root_pkg=1; $found+="package.json" }
-        if (Test-Path go.mod) { $has_go_mod=1; $found+="go.mod" }
+        if (Test-Path go.mod) { $has_go_mod=1; $go_mod_path="go.mod"; $found+="go.mod" }
+        # A module one level down is a normal layout, not an exception.
+        if (($has_go_mod -eq 0) -and (Test-Path go/go.mod)) { $has_go_mod=1; $go_mod_path="go/go.mod"; $found+="go/go.mod" }
         if (Test-Path main.go) { $has_main_go=1; $found+="main.go" }
         if (Test-Path CMakeLists.txt) { $has_cmake=1; $found+="CMakeLists.txt" }
         if (Test-Path mkdocs.yml) { $has_mkdocs=1; $found+="mkdocs.yml" }
@@ -181,8 +197,13 @@ runs:
         # Limited subtree search (depth ~2)
         Get-ChildItem -Recurse -Depth 2 -Filter package.json -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notlike "*node_modules*" } | ForEach-Object { $has_sub_npm=1 }
         Get-ChildItem -Recurse -Depth 2 -Filter mkdocs.yml -ErrorAction SilentlyContinue | ForEach-Object { $has_sub_mkdocs=1 }
+        # Wails v3 declares itself in the module — the only marker that
+        # separates it from v2 without guessing.
+        if ($go_mod_path -ne "" -and (Select-String -Path $go_mod_path -Pattern 'wails/v3' -Quiet -ErrorAction SilentlyContinue)) { $has_wails_v3=1 }
         $suggestion = "unknown"
-        if ((($has_go_mod -eq 1) -or ($has_main_go -eq 1)) -and (($has_root_pkg -eq 1) -or ($has_frontend_pkg -eq 1) -or ($has_sub_npm -eq 1))) { $suggestion = "wails2" }
+        if ((($has_go_mod -eq 1) -or ($has_main_go -eq 1)) -and (($has_root_pkg -eq 1) -or ($has_frontend_pkg -eq 1) -or ($has_sub_npm -eq 1))) {
+          if ($has_wails_v3 -eq 1) { $suggestion = "wails3" } else { $suggestion = "wails2" }
+        }
         elseif ($has_go_mod -eq 1) { $suggestion = "core" }
         elseif ($has_cmake -eq 1) { $suggestion = "cpp" }
         Write-Host "[DEBUG_LOG] HAS_ROOT_PACKAGE_JSON=$has_root_pkg"
@@ -263,7 +284,7 @@ outputs:
     description: "1 if a nested mkdocs.yml was found within depth 2"
     value: ${{ steps.proj_bash.outputs.HAS_SUB_MKDOCS || steps.proj_pwsh.outputs.HAS_SUB_MKDOCS }}
   PRIMARY_STACK_SUGGESTION:
-    description: "Computed primary stack suggestion (wails2/cpp/unknown)"
+    description: "Computed primary stack suggestion (wails3/wails2/core/cpp/unknown)"
     value: ${{ steps.proj_bash.outputs.PRIMARY_STACK_SUGGESTION || steps.proj_pwsh.outputs.PRIMARY_STACK_SUGGESTION }}
   FOUND_FILES:
     description: "Comma-separated summary of notable files found"

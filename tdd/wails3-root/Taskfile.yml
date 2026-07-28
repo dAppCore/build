@@ -1,0 +1,9 @@
+version: "3"
+
+includes:
+  darwin: ./build/darwin/Taskfile.yml
+  linux: ./build/linux/Taskfile.yml
+  windows: ./build/windows/Taskfile.yml
+
+vars:
+  WAILS3_TOOL: '{{.WAILS3_TOOL | default "go tool wails3"}}'

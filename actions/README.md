@@ -12,6 +12,7 @@ Sub-actions overview
   - setup/conan — Installs Conan via pip (placeholder for future C++ builds).
 - sign — Unified signing for macOS and Windows; notarizes on tag builds (macOS).
 - package — Upload artifacts and (on tags) publish a GitHub Release; includes smarter artifact naming and optional `artifact_meta.json`.
+- deps — Detect `dappco.re/*` deps with a newer published release and open/update a single `deps` issue, turning the dependency graph into the ecosystem's version-bump work queue. See [deps/README.md](deps/README.md).
 
 Stacks under actions/build/
 - build/wails2 — Full Wails v2 pipeline wrapper (discovery → options → setup → build → sign → package).

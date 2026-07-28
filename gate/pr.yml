@@ -1,0 +1,31 @@
+# gate/pr.yml — the PR (merge request) juncture (dappcore/devops/build).
+#
+# The merge gate: lint, THEN test. `lint` is in the `lint` stage and `test` is in
+# the later `test` stage, so GitLab does NOT run test if lint fails — a red linter
+# blocks the tests (and the merge) immediately. Pair with the project setting
+# "Pipelines must succeed" so the MR cannot merge until this pipeline is green.
+#
+# USE — in a repo's .gitlab-ci.yml:
+#   include:
+#     - { project: 'dappcore/devops/build', file: '/gate/pr.yml', ref: dev }
+#   lint:
+#     extends: .gate-lint
+#     script: [ 'cd go', 'test -z "$(gofmt -l .)"', 'go vet ./...' ]
+#   test:
+#     extends: .gate-test
+#     script: [ 'cd go', 'go test -count=1 ./...' ]
+stages: [lint, test, build, release]
+
+.gate-lint:
+  stage: lint
+  tags: [homelab]
+  interruptible: true
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+
+.gate-test:
+  stage: test                         # later stage → not run when the lint stage fails
+  tags: [homelab]
+  interruptible: true
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'

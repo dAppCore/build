@@ -45,13 +45,13 @@ runs:
   steps:
     - name: Discovery
       id: discovery
-      uses: host-uk/build/actions/discovery@dev
+      uses: dAppCore/build/actions/discovery@v4
       with:
         working-directory: ${{ inputs.app-working-directory }}
 
     - name: Delegate to directory orchestrator
       id: dir_orch
-      uses: host-uk/build/actions@dev
+      uses: dAppCore/build/actions@v4
       with:
         build: ${{ inputs.build }}
         sign: ${{ inputs.sign }}
@@ -70,7 +70,7 @@ runs:
       run: echo "[DEBUG_LOG] (root) Orchestrator selected stack=${{ steps.dir_orch.outputs.SELECTED_STACK }}"
 
     - name: Package & release
-      uses: host-uk/build/actions/package@dev
+      uses: dAppCore/build/actions/package@v4
       with:
         package: ${{ inputs.package }}
         build-name: ${{ inputs.build-name }}
