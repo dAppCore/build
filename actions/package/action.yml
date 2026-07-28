@@ -194,8 +194,13 @@ runs:
         while IFS= read -r f; do
           [ -f "$f" ] || continue
           case "$f" in *.json) continue ;; esac
+          # Basename first: the path is ./bin/core, and testing the whole
+          # path for a dot matched the "./" and produced an extension of
+          # "/bin/core". Windows passed by luck, its .exe being the last dot
+          # either way.
+          base="${f##*/}"
           ext=""
-          case "$f" in *.*) ext=".${f##*.}" ;; esac
+          case "$base" in *.*) ext=".${base##*.}" ;; esac
           cp "$f" ".release-assets/${prefix}-${os}-${arch}${ext}"
           staged=$((staged+1))
         done < <(find . -path '*/bin/*' -type f -not -path './.release-assets/*' 2>/dev/null)
