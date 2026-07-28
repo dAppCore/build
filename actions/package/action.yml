@@ -44,6 +44,33 @@ inputs:
     description: "Include artifact_meta.json with discovery metadata in the uploaded artifact"
     required: false
     default: "true"
+  deb:
+    description: >
+      Also build a .deb and attach it to the release. Linux runners only —
+      there is no such thing as a macOS or Windows Debian package, so the step
+      skips elsewhere rather than failing the job.
+    required: false
+    default: "false"
+  deb-maintainer:
+    description: "Debian Maintainer field, as `Name <email>`. Required by policy when deb is on."
+    required: false
+    default: ""
+  deb-description:
+    description: "One-line package summary. Defaults to the repository name."
+    required: false
+    default: ""
+  deb-homepage:
+    description: "Homepage field. Defaults to the repository URL."
+    required: false
+    default: ""
+  deb-depends:
+    description: "Comma-separated Depends. A static Go binary usually needs none."
+    required: false
+    default: ""
+  deb-section:
+    description: "Debian section"
+    required: false
+    default: "devel"
 runs:
   using: "composite"
   steps:
@@ -240,10 +267,108 @@ runs:
 
         test -f "$out"
 
-        rm -rf .release-staging
         echo "[DEBUG_LOG] $staged file(s) into $asset"
         echo "ASSET=$asset" >> "$GITHUB_OUTPUT"
+        echo "OS=$os" >> "$GITHUB_OUTPUT"
+        echo "ARCH=$arch" >> "$GITHUB_OUTPUT"
+        echo "PREFIX=$prefix" >> "$GITHUB_OUTPUT"
         ls -la .release-assets
+
+    - name: Build .deb
+      # Linux only: a Debian package for darwin or windows is meaningless, and
+      # a job that fails for asking is worse than one that says why it skipped.
+      if: inputs.package == 'true' && inputs.deb == 'true' && steps.assets.outputs.ASSET != ''
+      shell: bash
+      env:
+        DEB_OS: ${{ steps.assets.outputs.OS }}
+        DEB_ARCH: ${{ steps.assets.outputs.ARCH }}
+        DEB_NAME: ${{ steps.assets.outputs.PREFIX }}
+        DEB_TAG: ${{ inputs.tag }}
+        DEB_MAINTAINER: ${{ inputs.deb-maintainer }}
+        DEB_DESCRIPTION: ${{ inputs.deb-description }}
+        DEB_HOMEPAGE: ${{ inputs.deb-homepage }}
+        DEB_DEPENDS: ${{ inputs.deb-depends }}
+        DEB_SECTION: ${{ inputs.deb-section }}
+        DEB_REPO: ${{ github.repository }}
+        DEB_SERVER: ${{ github.server_url }}
+      run: |
+        set -euo pipefail
+
+        if [ "$DEB_OS" != "linux" ]; then
+          echo "::notice::no .deb on $DEB_OS — Debian packages are a Linux format"
+          exit 0
+        fi
+        if ! command -v dpkg-deb >/dev/null 2>&1; then
+          echo "::warning::dpkg-deb not available on this runner; skipping the .deb"
+          exit 0
+        fi
+
+        # Debian versions must start with a digit, so the v every Go tag
+        # carries comes off. Without a tag there is no release to attach to.
+        version="${DEB_TAG#v}"
+        if [ -z "$version" ]; then
+          echo "::notice::no tag — nothing to version a .deb with"
+          exit 0
+        fi
+
+        # GOARCH and Debian agree on amd64 and arm64 and disagree on the rest.
+        case "$DEB_ARCH" in
+          amd64)   deb_arch=amd64 ;;
+          arm64)   deb_arch=arm64 ;;
+          386)     deb_arch=i386 ;;
+          arm)     deb_arch=armhf ;;
+          ppc64le) deb_arch=ppc64el ;;
+          *)       deb_arch="$DEB_ARCH" ;;
+        esac
+
+        binary=".release-staging/$DEB_NAME"
+        if [ ! -f "$binary" ]; then
+          binary="$(find .release-staging -maxdepth 1 -type f | head -1)"
+        fi
+        if [ ! -f "$binary" ]; then
+          echo "::warning::no staged binary to package"
+          exit 0
+        fi
+
+        root=".deb-build"
+        rm -rf "$root"
+        mkdir -p "$root/DEBIAN" "$root/usr/bin"
+        install -m 0755 "$binary" "$root/usr/bin/$DEB_NAME"
+
+        maintainer="${DEB_MAINTAINER:-$DEB_REPO <noreply@github.com>}"
+        description="${DEB_DESCRIPTION:-$DEB_NAME}"
+        homepage="${DEB_HOMEPAGE:-$DEB_SERVER/$DEB_REPO}"
+        # In KiB, rounded up: apt shows it before downloading and a 0 reads as
+        # a broken package.
+        size=$(( ( $(wc -c < "$binary") + 1023 ) / 1024 ))
+
+        {
+          echo "Package: $DEB_NAME"
+          echo "Version: $version"
+          echo "Section: ${DEB_SECTION:-devel}"
+          echo "Priority: optional"
+          echo "Architecture: $deb_arch"
+          echo "Maintainer: $maintainer"
+          echo "Installed-Size: $size"
+          [ -n "$DEB_DEPENDS" ] && echo "Depends: $DEB_DEPENDS"
+          echo "Homepage: $homepage"
+          echo "Description: $description"
+        } > "$root/DEBIAN/control"
+
+        deb=".release-assets/${DEB_NAME}_${version}_${deb_arch}.deb"
+        # --root-owner-group so the package does not carry the runner's uid,
+        # which would make the files unownable on the installing machine.
+        dpkg-deb --root-owner-group --build "$root" "$deb"
+
+        test -f "$deb"
+        dpkg-deb --info "$deb"
+        rm -rf "$root"
+        echo "[DEBUG_LOG] built $deb"
+
+    - name: Clean staging
+      if: always()
+      shell: bash
+      run: rm -rf .release-staging
 
     - name: Release
       uses: softprops/action-gh-release@v1
