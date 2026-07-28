@@ -116,14 +116,14 @@ runs:
       with:
         working-directory: ${{ inputs.app-working-directory }}
 
-    # wails-dev-build skips installing the Wails CLI. A plain Go build has no
-    # use for it, and pulling it would add a minute to every run.
+    # A plain Go build has no use for the Wails CLI, and pulling it would add a
+    # minute to every run.
     - name: Setup Go
       uses: dAppCore/build/actions/setup/go@v4
       with:
         go-version: ${{ inputs.go-version }}
         build-cache: ${{ inputs.build-cache }}
-        wails-dev-build: 'true'
+        install-wails: 'false'
 
     - name: Test
       id: test

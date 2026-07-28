@@ -74,6 +74,8 @@ jobs:
           - { dir: 'tdd/go-http', expect: 'go', expect_root_pkg: '0', expect_frontend_pkg: '0', expect_go_mod: '1', expect_main_go: '1', expect_cmake: '0' }
           # Runtime comes from the lockfile; framework is a separate axis.
           - { dir: 'tdd/node-astro', expect: 'node', expect_root_pkg: '1', expect_frontend_pkg: '0', expect_go_mod: '0', expect_main_go: '0', expect_cmake: '0' }
+          - { dir: 'tdd/node-pnpm', expect: 'node', expect_root_pkg: '1', expect_frontend_pkg: '0', expect_go_mod: '0', expect_main_go: '0', expect_cmake: '0' }
+          - { dir: 'tdd/node-yarn', expect: 'node', expect_root_pkg: '1', expect_frontend_pkg: '0', expect_go_mod: '0', expect_main_go: '0', expect_cmake: '0' }
           - { dir: 'tdd/deno-danet', expect: 'deno', expect_root_pkg: '0', expect_frontend_pkg: '0', expect_go_mod: '0', expect_main_go: '0', expect_cmake: '0' }
           - { dir: 'tdd/cpp-root', expect: 'cpp', expect_root_pkg: '0', expect_frontend_pkg: '0', expect_go_mod: '0', expect_main_go: '0', expect_cmake: '1' }
           - { dir: 'tdd/node-only', expect: 'node', expect_root_pkg: '1', expect_frontend_pkg: '0', expect_go_mod: '0', expect_main_go: '0', expect_cmake: '0' }
@@ -689,6 +691,37 @@ jobs:
           test "${{ steps.node.outputs.OUTPUT_PATH }}" = "dist"
           test -f tdd/node-astro/dist/index.html
           grep -q "Built by dAppCore/build" tdd/node-astro/dist/index.html
+
+  # Package managers are not runtimes: pnpm and yarn install a Node tree the
+  # same package.json describes. What differs is the lockfile and the spelling
+  # of "use it and refuse to change it" — npm ci, pnpm --frozen-lockfile,
+  # yarn --immutable at v2 and --frozen-lockfile at v1. Each fixture commits a
+  # real lockfile so those paths are actually taken.
+  build-node-package-managers:
+    name: Node stack with ${{ matrix.pm }}
+    needs: [action-contracts, discovery-fixture-tests]
+    strategy:
+      fail-fast: false
+      matrix:
+        pm: [pnpm, yarn]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build with the node stack
+        id: node
+        uses: ./actions/build/node
+        with:
+          build-name: ${{ matrix.pm }}-fixture
+          app-working-directory: tdd/node-${{ matrix.pm }}
+          package: false
+      - name: Assert the right manager ran
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ steps.node.outputs.PACKAGE_MANAGER }}" = "${{ matrix.pm }}"
+          test "${{ steps.node.outputs.OUTPUT_PATH }}" = "dist"
+          test -f "tdd/node-${{ matrix.pm }}/dist/index.html"
+
 
   build-deno:
     name: Build Deno project (Danet) on ${{ matrix.os }}

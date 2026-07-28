@@ -27,14 +27,21 @@ inputs:
     required: false
     default: ""
   install:
-    description: "Run npm ci before building"
+    description: "Install dependencies before building"
     required: false
     default: "true"
+  package-manager:
+    description: "npm, pnpm or yarn. `auto` reads the lockfile."
+    required: false
+    default: "auto"
   base-href:
     description: "Passed to ng build --base-href. Required for a site served from a subdirectory."
     required: false
     default: ""
 outputs:
+  PACKAGE_MANAGER:
+    description: "The package manager that ran"
+    value: ${{ steps.build.outputs.PACKAGE_MANAGER }}
   OUTPUT_PATH:
     description: "Directory the build wrote, relative to the working directory"
     value: ${{ steps.build.outputs.OUTPUT_PATH }}
@@ -49,7 +56,8 @@ runs:
         build: ${{ inputs.build }}
         app-working-directory: ${{ inputs.app-working-directory }}
         build-script: ${{ inputs.build-script }}
-        build-args: ${{ inputs.base-href && format(--base-href {0} {1}, inputs.base-href, inputs.build-args) || inputs.build-args }}
+        build-args: ${{ inputs.base-href && format('--base-href {0} {1}', inputs.base-href, inputs.build-args) || inputs.build-args }}
         install: ${{ inputs.install }}
+        package-manager: ${{ inputs.package-manager }}
         output-directory: ${{ inputs.output-directory }}
         output-candidates: "dist"

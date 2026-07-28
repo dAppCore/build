@@ -154,6 +154,17 @@ runs:
           js_runtime="node"
         fi
 
+        # On Node the lockfile also says which package manager installed the
+        # tree. Using the wrong one resolves a different tree from the one the
+        # developer tested, so it is read rather than assumed.
+        js_pm=""
+        if [ "$js_runtime" = "node" ]; then
+          if [ -f "pnpm-lock.yaml" ]; then js_pm="pnpm"
+          elif [ -f "yarn.lock" ]; then js_pm="yarn"
+          elif [ -f "package-lock.json" ]; then js_pm="npm"
+          fi
+        fi
+
         # The framework is a separate question from the runtime — the same
         # framework runs under more than one — so it is detected separately and
         # reported separately.
@@ -207,6 +218,7 @@ runs:
         echo "[DEBUG_LOG] HAS_GO_MAIN_PACKAGE=$has_go_main"
         echo "[DEBUG_LOG] JS_RUNTIME=${js_runtime:-none}"
         echo "[DEBUG_LOG] JS_FRAMEWORK=${js_framework:-none}"
+        echo "[DEBUG_LOG] JS_PACKAGE_MANAGER=${js_pm:-none}"
         echo "[DEBUG_LOG] HAS_ROOT_CMAKELISTS=$has_cmake"
         echo "[DEBUG_LOG] HAS_ROOT_MKDOCS=$has_mkdocs"
         echo "[DEBUG_LOG] HAS_SUB_NPM=$has_sub_npm"
@@ -220,6 +232,7 @@ runs:
         echo "HAS_GO_MAIN_PACKAGE=$has_go_main" >> "$GITHUB_OUTPUT"
         echo "JS_RUNTIME=$js_runtime" >> "$GITHUB_OUTPUT"
         echo "JS_FRAMEWORK=$js_framework" >> "$GITHUB_OUTPUT"
+        echo "JS_PACKAGE_MANAGER=$js_pm" >> "$GITHUB_OUTPUT"
         echo "HAS_ROOT_CMAKELISTS=$has_cmake" >> "$GITHUB_OUTPUT"
         echo "HAS_ROOT_MKDOCS=$has_mkdocs" >> "$GITHUB_OUTPUT"
         echo "HAS_SUB_NPM=$has_sub_npm" >> "$GITHUB_OUTPUT"
@@ -259,6 +272,14 @@ runs:
         if ((Test-Path deno.json) -or (Test-Path deno.jsonc) -or (Test-Path deno.lock)) { $js_runtime = "deno" }
         elseif ((Test-Path bun.lockb) -or (Test-Path bun.lock)) { $js_runtime = "bun" }
         elseif ($has_root_pkg -eq 1) { $js_runtime = "node" }
+
+        # The lockfile also names the package manager on Node.
+        $js_pm = ""
+        if ($js_runtime -eq "node") {
+          if (Test-Path pnpm-lock.yaml) { $js_pm = "pnpm" }
+          elseif (Test-Path yarn.lock) { $js_pm = "yarn" }
+          elseif (Test-Path package-lock.json) { $js_pm = "npm" }
+        }
 
         # Framework is a separate axis from runtime.
         $js_framework = ""
@@ -303,6 +324,7 @@ runs:
         Write-Host "[DEBUG_LOG] HAS_GO_MAIN_PACKAGE=$has_go_main"
         Write-Host "[DEBUG_LOG] JS_RUNTIME=$js_runtime"
         Write-Host "[DEBUG_LOG] JS_FRAMEWORK=$js_framework"
+        Write-Host "[DEBUG_LOG] JS_PACKAGE_MANAGER=$js_pm"
         Write-Host "[DEBUG_LOG] HAS_ROOT_CMAKELISTS=$has_cmake"
         Write-Host "[DEBUG_LOG] HAS_ROOT_MKDOCS=$has_mkdocs"
         Write-Host "[DEBUG_LOG] HAS_SUB_NPM=$has_sub_npm"
@@ -315,6 +337,7 @@ runs:
         "HAS_GO_MAIN_PACKAGE=$has_go_main" >> $Env:GITHUB_OUTPUT
         "JS_RUNTIME=$js_runtime" >> $Env:GITHUB_OUTPUT
         "JS_FRAMEWORK=$js_framework" >> $Env:GITHUB_OUTPUT
+        "JS_PACKAGE_MANAGER=$js_pm" >> $Env:GITHUB_OUTPUT
         "HAS_ROOT_CMAKELISTS=$has_cmake" >> $Env:GITHUB_OUTPUT
         "HAS_ROOT_MKDOCS=$has_mkdocs" >> $Env:GITHUB_OUTPUT
         "HAS_SUB_NPM=$has_sub_npm" >> $Env:GITHUB_OUTPUT
@@ -376,6 +399,9 @@ outputs:
   JS_FRAMEWORK:
     description: "Framework marker: angular, astro, next, nuxt, svelte, vite, danet, or empty"
     value: ${{ steps.proj_bash.outputs.JS_FRAMEWORK || steps.proj_pwsh.outputs.JS_FRAMEWORK }}
+  JS_PACKAGE_MANAGER:
+    description: "Package manager from the lockfile on Node: npm, pnpm, yarn, or empty"
+    value: ${{ steps.proj_bash.outputs.JS_PACKAGE_MANAGER || steps.proj_pwsh.outputs.JS_PACKAGE_MANAGER }}
   HAS_ROOT_CMAKELISTS:
     description: "1 if CMakeLists.txt at root of working-directory"
     value: ${{ steps.proj_bash.outputs.HAS_ROOT_CMAKELISTS || steps.proj_pwsh.outputs.HAS_ROOT_CMAKELISTS }}

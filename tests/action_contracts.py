@@ -7,6 +7,7 @@ nothing, or a consumer reads an output that is always the empty string.
 """
 
 import pathlib
+import re
 import sys
 
 import yaml
@@ -42,6 +43,15 @@ def main() -> int:
             if "run" in step and "shell" not in step:
                 label = step.get("name", f"step {i}")
                 problems.append(f"{rel}: '{label}' has run: without shell:")
+
+        # A malformed ${{ }} expression is valid YAML and rejected by the
+        # runner at load time — and because every referenced manifest is
+        # validated up front, a broken adapter fails jobs that never call it.
+        # format() with an unquoted first argument is the way that happens.
+        for i, line in enumerate(path.read_text().split("\n"), 1):
+            for call in re.findall(r"format\(\s*[^'\"\s)]", line):
+                problems.append(
+                    f"{rel}:{i}: format() first argument is not quoted — the runner will reject this manifest")
 
         # Inputs need a description or the marketplace listing renders blanks.
         for name, spec in (doc.get("inputs") or {}).items():

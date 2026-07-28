@@ -1,0 +1,8 @@
+{
+  "name": "node-yarn-fixture",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "build": "node build.mjs"
+  }
+}

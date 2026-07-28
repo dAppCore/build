@@ -34,11 +34,20 @@ inputs:
     required: false
     default: "dist build out .output public"
   install:
-    description: "Run npm ci before building"
+    description: "Install dependencies before building"
     required: false
     default: "true"
+  package-manager:
+    description: >
+      npm, pnpm or yarn. `auto` reads the lockfile, which is the only file that
+      says which one actually installed the tree.
+    required: false
+    default: "auto"
 
 outputs:
+  PACKAGE_MANAGER:
+    description: "The package manager that ran"
+    value: ${{ steps.pm.outputs.PM }}
   OUTPUT_PATH:
     description: "Directory the build wrote, relative to the working directory"
     value: ${{ steps.build.outputs.OUTPUT_PATH }}
@@ -46,20 +55,77 @@ outputs:
 runs:
   using: "composite"
   steps:
+    - name: Resolve the package manager
+      id: pm
+      if: inputs.build == 'true'
+      shell: bash
+      working-directory: ${{ inputs.app-working-directory }}
+      env:
+        REQUESTED: ${{ inputs.package-manager }}
+      run: |
+        set -euo pipefail
+
+        PM="$REQUESTED"
+        if [ "$PM" = "auto" ] || [ -z "$PM" ]; then
+          if [ -f pnpm-lock.yaml ]; then PM=pnpm
+          elif [ -f yarn.lock ]; then PM=yarn
+          else PM=npm
+          fi
+        fi
+
+        case "$PM" in
+          npm|pnpm|yarn) ;;
+          *) echo "::error::unknown package manager '$PM'"; exit 1 ;;
+        esac
+
+        # corepack ships pnpm and yarn with Node and honours the packageManager
+        # field, so the project's pinned version is the one that runs. It is
+        # being unbundled from newer Node releases, hence the fallback.
+        if [ "$PM" != "npm" ] && ! command -v "$PM" >/dev/null 2>&1; then
+          if command -v corepack >/dev/null 2>&1; then
+            corepack enable
+            corepack prepare "$PM@latest" --activate 2>/dev/null || true
+          fi
+          if ! command -v "$PM" >/dev/null 2>&1; then
+            echo "::notice::corepack did not provide $PM — installing it globally"
+            npm install -g "$PM"
+          fi
+        fi
+
+        echo "[DEBUG_LOG] (node) package manager: $PM $($PM --version 2>/dev/null || echo '?')"
+        echo "PM=$PM" >> "$GITHUB_OUTPUT"
+
     - name: Install dependencies
       if: inputs.build == 'true' && inputs.install == 'true'
       shell: bash
       working-directory: ${{ inputs.app-working-directory }}
+      env:
+        PM: ${{ steps.pm.outputs.PM }}
       run: |
         set -euo pipefail
-        # ci is reproducible and needs a lockfile; install is the fallback for a
-        # project that has not committed one.
-        if [ -f package-lock.json ]; then
-          npm ci
-        else
-          echo "::notice::no package-lock.json — falling back to npm install"
-          npm install
-        fi
+
+        # Each manager has a "use the lockfile and refuse to change it" mode.
+        # They are spelled differently, and yarn changed the spelling at v2.
+        case "$PM" in
+          npm)
+            if [ -f package-lock.json ]; then npm ci
+            else echo "::notice::no package-lock.json — falling back to npm install"; npm install; fi
+            ;;
+          pnpm)
+            if [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile
+            else echo "::notice::no pnpm-lock.yaml — installing without one"; pnpm install; fi
+            ;;
+          yarn)
+            major="$(yarn --version 2>/dev/null | cut -d. -f1)"
+            if [ -f yarn.lock ]; then
+              if [ "${major:-1}" -ge 2 ]; then yarn install --immutable
+              else yarn install --frozen-lockfile; fi
+            else
+              echo "::notice::no yarn.lock — installing without one"
+              yarn install
+            fi
+            ;;
+        esac
 
     - name: Build
       id: build
@@ -71,6 +137,7 @@ runs:
         EXTRA: ${{ inputs.build-args }}
         OUT: ${{ inputs.output-directory }}
         CANDIDATES: ${{ inputs.output-candidates }}
+        PM: ${{ steps.pm.outputs.PM }}
       run: |
         set -euo pipefail
 
@@ -82,10 +149,13 @@ runs:
         before="$(mktemp)"
         ls -1A > "$before"
 
+        # npm needs -- to pass arguments through to the script; pnpm and yarn
+        # forward them directly and treat a bare -- as an argument.
         if [ -n "$EXTRA" ]; then
-          npm run "$SCRIPT" -- $EXTRA
+          if [ "$PM" = "npm" ]; then "$PM" run "$SCRIPT" -- $EXTRA
+          else "$PM" run "$SCRIPT" $EXTRA; fi
         else
-          npm run "$SCRIPT"
+          "$PM" run "$SCRIPT"
         fi
 
         out="$OUT"

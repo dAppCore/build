@@ -18,15 +18,24 @@ inputs:
     required: false
     default: "latest"
   wails-dev-build:
-    description: "Skip installing the Wails CLI — for stacks that do not need it"
+    description: "Legacy alias for install-wails: false. Kept so existing callers keep working."
     required: false
     default: "false"
+  install-wails:
+    description: >
+      Install the Wails v2 CLI. False for a stack that has no use for it — a
+      plain Go build, for instance, where pulling it costs a minute a run.
+    required: false
+    default: "true"
 runs:
   using: "composite"
   steps:
+    # Unconditional. This step used to be gated on wails-dev-build, so asking
+    # not to install the Wails CLI also skipped installing Go — invisible on
+    # Linux and Windows runners, which ship a Go, and a "go: command not found"
+    # on macOS, which does not.
     - name: Setup GoLang
       uses: actions/setup-go@v5
-      if: inputs.wails-dev-build == 'false'
       with:
         check-latest: true
         cache: ${{ inputs.build-cache }}
@@ -39,7 +48,7 @@ runs:
     - run: go version
       shell: bash
     - name: Install Wails
-      if: inputs.wails-dev-build == 'false'
+      if: inputs.install-wails == 'true' && inputs.wails-dev-build == 'false'
       run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ inputs.wails-version }}
       shell: bash
     - name: Install macOS deps (gon)

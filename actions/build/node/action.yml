@@ -54,6 +54,12 @@ inputs:
     description: "Install dependencies before building"
     required: false
     default: "true"
+  package-manager:
+    description: >
+      npm, pnpm or yarn. `auto` reads the lockfile — the only file that says
+      which one actually installed the tree.
+    required: false
+    default: "auto"
   app-working-directory:
     description: "Directory holding package.json"
     required: false
@@ -66,6 +72,9 @@ outputs:
   FRAMEWORK:
     description: "The framework adapter that ran, or `none`"
     value: ${{ steps.fw.outputs.FRAMEWORK }}
+  PACKAGE_MANAGER:
+    description: "The package manager that ran"
+    value: ${{ steps.angular.outputs.PACKAGE_MANAGER || steps.astro.outputs.PACKAGE_MANAGER || steps.next.outputs.PACKAGE_MANAGER || steps.vite.outputs.PACKAGE_MANAGER || steps.plain.outputs.PACKAGE_MANAGER }}
   OUTPUT_PATH:
     description: "Directory the build wrote, relative to the working directory"
     value: ${{ steps.angular.outputs.OUTPUT_PATH || steps.astro.outputs.OUTPUT_PATH || steps.next.outputs.OUTPUT_PATH || steps.vite.outputs.OUTPUT_PATH || steps.plain.outputs.OUTPUT_PATH }}
@@ -121,6 +130,7 @@ runs:
         base-href: ${{ inputs.base-href }}
         output-directory: ${{ inputs.output-directory }}
         install: ${{ inputs.install }}
+        package-manager: ${{ inputs.package-manager }}
 
     - name: Astro
       id: astro
@@ -133,6 +143,7 @@ runs:
         build-args: ${{ inputs.build-args }}
         output-directory: ${{ inputs.output-directory }}
         install: ${{ inputs.install }}
+        package-manager: ${{ inputs.package-manager }}
 
     - name: Next.js
       id: next
@@ -145,6 +156,7 @@ runs:
         build-args: ${{ inputs.build-args }}
         output-directory: ${{ inputs.output-directory }}
         install: ${{ inputs.install }}
+        package-manager: ${{ inputs.package-manager }}
 
     - name: Vite
       id: vite
@@ -157,6 +169,7 @@ runs:
         build-args: ${{ inputs.build-args }}
         output-directory: ${{ inputs.output-directory }}
         install: ${{ inputs.install }}
+        package-manager: ${{ inputs.package-manager }}
 
     - name: Plain build script
       id: plain
@@ -169,6 +182,7 @@ runs:
         build-args: ${{ inputs.build-args }}
         output-directory: ${{ inputs.output-directory }}
         install: ${{ inputs.install }}
+        package-manager: ${{ inputs.package-manager }}
 
     - name: Package & release
       uses: dAppCore/build/actions/package@v4
