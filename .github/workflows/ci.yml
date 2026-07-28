@@ -208,6 +208,53 @@ jobs:
           if command -v wails >/dev/null 2>&1; then wails version || true; else echo "wails not on PATH (may be Windows PATH nuance), continuing"; fi
  
 
+  setup-core-tests:
+    name: Setup core sub-action on ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install core
+        id: core
+        uses: ./actions/setup/core
+        with:
+          token: ${{ github.token }}
+      - name: Assert core is usable, not merely present
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # On PATH by name: a binary installed somewhere the later steps
+          # cannot reach is the failure this job exists to catch.
+          command -v core
+          core --help > /dev/null
+
+          # The surfaces are the reason to install it. core composes
+          # dappco.re/go/build and dappco.re/go/lint, so their absence means
+          # the binary is there but the tooling is not.
+          core --help 2>/dev/null | sed -E 's/\x1b\[[0-9;]*m//g' > surfaces.txt
+          for surface in "build" "go qa" "qa audit"; do
+            grep -qE "^  ${surface}( |\$)" surfaces.txt \
+              || { echo "::error::'$surface' missing from the installed core"; exit 1; }
+          done
+
+          echo "[DEBUG_LOG] core ${{ steps.core.outputs.CORE_VERSION }} via ${{ steps.core.outputs.CORE_METHOD }}"
+
+      - name: Linux takes the native package
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          # apt is published for Linux, so falling back to the archive there
+          # means the .deb stopped being attached to releases — worth failing
+          # over, because the fallback would otherwise hide it.
+          test "${{ steps.core.outputs.CORE_METHOD }}" = "apt" \
+            || { echo "::error::Linux installed via '${{ steps.core.outputs.CORE_METHOD }}', expected apt"; exit 1; }
+          dpkg -s core > /dev/null
+
   setup-npm-tests:
     name: Setup npm sub-action on ${{ matrix.os }}
     needs: [options-tests, wails-env-mapping, wails-env-mapping-wrapper]
