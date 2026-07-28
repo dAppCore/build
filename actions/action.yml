@@ -24,6 +24,42 @@ inputs:
     required: false
     default: "."
     description: "Root of the app being built"
+  main-package:
+    required: false
+    default: ""
+    description: "Package to build; empty auto-detects"
+  build-tags:
+    required: false
+    default: ""
+    description: "Comma-separated build tags"
+  ldflags:
+    required: false
+    default: ""
+    description: "Passed to -ldflags"
+  cgo:
+    required: false
+    default: "auto"
+    description: "auto, 0 or 1"
+  test:
+    required: false
+    default: "auto"
+    description: "auto runs tests when the module has any; true requires them; false skips"
+  coverage:
+    required: false
+    default: "false"
+    description: "Produce a coverage profile"
+  codecov:
+    required: false
+    default: "false"
+    description: "Upload coverage to Codecov. Implies coverage."
+  codecov-token:
+    required: false
+    default: ""
+    description: "Codecov token. Public repositories can upload without one."
+  benchmarks:
+    required: false
+    default: "false"
+    description: "Run benchmarks after the tests"
   go-directory:
     required: false
     default: ""
@@ -118,6 +154,16 @@ runs:
         build-name: ${{ inputs.build-name }}
         build-platform: ${{ inputs.build-platform }}
         app-working-directory: ${{ inputs.app-working-directory }}
+        go-directory: ${{ inputs.go-directory }}
+        main-package: ${{ inputs.main-package }}
+        build-tags: ${{ inputs.build-tags }}
+        ldflags: ${{ inputs.ldflags }}
+        cgo: ${{ inputs.cgo }}
+        test: ${{ inputs.test }}
+        coverage: ${{ inputs.coverage }}
+        codecov: ${{ inputs.codecov }}
+        codecov-token: ${{ inputs.codecov-token }}
+        benchmarks: ${{ inputs.benchmarks }}
 
     # cpp takes no build-platform for the same reason v3 does not: the
     # conanfile's profile and layout decide the target, and the runner decides

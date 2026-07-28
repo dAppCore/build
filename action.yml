@@ -23,6 +23,42 @@ inputs:
     description: "Platform to build for (e.g., linux/amd64, windows/amd64, darwin/universal)"
     required: false
     default: "darwin/universal"
+  main-package:
+    description: "Package to build; empty auto-detects"
+    required: false
+    default: ""
+  build-tags:
+    description: "Comma-separated build tags"
+    required: false
+    default: ""
+  ldflags:
+    description: "Passed to -ldflags"
+    required: false
+    default: ""
+  cgo:
+    description: "auto, 0 or 1"
+    required: false
+    default: "auto"
+  test:
+    description: "auto runs tests when the module has any; true requires them; false skips"
+    required: false
+    default: "auto"
+  coverage:
+    description: "Produce a coverage profile"
+    required: false
+    default: "false"
+  codecov:
+    description: "Upload coverage to Codecov. Implies coverage."
+    required: false
+    default: "false"
+  codecov-token:
+    description: "Codecov token. Public repositories can upload without one."
+    required: false
+    default: ""
+  benchmarks:
+    description: "Run benchmarks after the tests"
+    required: false
+    default: "false"
   go-directory:
     description: "Where the Go module lives, relative to the working directory"
     required: false
@@ -64,6 +100,15 @@ runs:
         build-platform: ${{ inputs.build-platform }}
         app-working-directory: ${{ inputs.app-working-directory }}
         go-directory: ${{ inputs.go-directory }}
+        main-package: ${{ inputs.main-package }}
+        build-tags: ${{ inputs.build-tags }}
+        ldflags: ${{ inputs.ldflags }}
+        cgo: ${{ inputs.cgo }}
+        test: ${{ inputs.test }}
+        coverage: ${{ inputs.coverage }}
+        codecov: ${{ inputs.codecov }}
+        codecov-token: ${{ inputs.codecov-token }}
+        benchmarks: ${{ inputs.benchmarks }}
         AUTO_STACK: ${{ inputs.AUTO_STACK }}
         AUTO_SETUP: ${{ inputs.AUTO_SETUP }}
         STACK: ${{ inputs.STACK }}
