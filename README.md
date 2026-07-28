@@ -72,4 +72,5 @@ Or call a stack directly: `dAppCore/build/actions/build/wails3@v4`.
 
 **Full documentation: [dappco.re/build](https://dappco.re/build/)**
 
-`@v4` follows the latest v4 release. Pin `@v4.1.0` to choose your own upgrades.
+`@v4` follows the newest v4 release, `@v4.2` the newest v4.2.x, and `@v4.2.0`
+never moves. Pick the one that matches how much movement you want.

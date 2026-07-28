@@ -1,0 +1,140 @@
+name: "Deno (full pipeline)"
+description: >
+  Deno toolchain, framework dispatch, build and packaging.
+
+  Its own stack rather than a flag on Node, because Deno installs nothing,
+  resolves imports from URLs and JSR, and produces a compiled binary instead of
+  a dist directory. Those are different enough that sharing a pipeline would
+  mean branching on the runtime at every step.
+
+inputs:
+  build:
+    description: "Whether to run the build"
+    required: false
+    default: "true"
+  sign:
+    description: "Sign the build where signing is configured"
+    required: false
+    default: "false"
+  package:
+    description: "Upload the artifact, and release on a tag"
+    required: false
+    default: "true"
+  build-name:
+    description: "Base name for the binary and artifact"
+    required: true
+  framework:
+    description: "Framework adapter. Empty takes discovery's answer; `none` forces the plain path."
+    required: false
+    default: ""
+  deno-version:
+    description: "Deno version to install"
+    required: false
+    default: "v2.x"
+  entry:
+    description: "Entry module to compile"
+    required: false
+    default: ""
+  permissions:
+    description: "Permission flags baked into the compiled binary"
+    required: false
+    default: "--allow-net --allow-read --allow-env"
+  build-task:
+    description: "Task to run instead of compiling"
+    required: false
+    default: ""
+  output-directory:
+    description: "Where the binary is written"
+    required: false
+    default: "bin"
+  app-working-directory:
+    description: "Directory holding deno.json"
+    required: false
+    default: "."
+
+outputs:
+  SELECTED_STACK:
+    description: "Always deno; lets the orchestrator report what it chose"
+    value: "deno"
+  FRAMEWORK:
+    description: "The framework adapter that ran, or `none`"
+    value: ${{ steps.fw.outputs.FRAMEWORK }}
+  BINARY_PATH:
+    description: "Path to the compiled binary, when compiling"
+    value: ${{ steps.danet.outputs.BINARY_PATH || steps.plain.outputs.BINARY_PATH }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Discovery
+      id: discovery
+      uses: dAppCore/build/actions/discovery@v4
+      with:
+        working-directory: ${{ inputs.app-working-directory }}
+
+    - name: Setup Deno
+      uses: denoland/setup-deno@v2
+      with:
+        deno-version: ${{ inputs.deno-version }}
+
+    - name: Resolve the framework
+      id: fw
+      shell: bash
+      env:
+        REQUESTED: ${{ inputs.framework }}
+        DETECTED: ${{ steps.discovery.outputs.JS_FRAMEWORK }}
+      run: |
+        set -euo pipefail
+        FRAMEWORK="${REQUESTED:-$DETECTED}"
+        case "$FRAMEWORK" in
+          danet) ;;
+          none|"") FRAMEWORK="none" ;;
+          *)
+            echo "::notice::no Deno adapter for '$FRAMEWORK'; using the plain build"
+            FRAMEWORK="none"
+            ;;
+        esac
+        echo "[DEBUG_LOG] (deno) framework=$FRAMEWORK"
+        echo "FRAMEWORK=$FRAMEWORK" >> "$GITHUB_OUTPUT"
+
+    - name: Danet
+      id: danet
+      if: steps.fw.outputs.FRAMEWORK == 'danet'
+      uses: dAppCore/build/actions/build/deno/framework/danet@v4
+      with:
+        build: ${{ inputs.build }}
+        app-working-directory: ${{ inputs.app-working-directory }}
+        build-name: ${{ inputs.build-name }}
+        permissions: ${{ inputs.permissions }}
+        output-directory: ${{ inputs.output-directory }}
+
+    - name: Plain build
+      id: plain
+      if: steps.fw.outputs.FRAMEWORK == 'none'
+      uses: dAppCore/build/actions/build/deno/build@v4
+      with:
+        build: ${{ inputs.build }}
+        app-working-directory: ${{ inputs.app-working-directory }}
+        build-name: ${{ inputs.build-name }}
+        entry: ${{ inputs.entry }}
+        permissions: ${{ inputs.permissions }}
+        build-task: ${{ inputs.build-task }}
+        output-directory: ${{ inputs.output-directory }}
+
+    - name: Sign artifacts (OS-conditional)
+      uses: dAppCore/build/actions/sign@v4
+      with:
+        sign: ${{ inputs.sign }}
+        app-working-directory: ${{ inputs.app-working-directory }}
+        build-name: ${{ inputs.build-name }}
+
+    - name: Package & release
+      uses: dAppCore/build/actions/package@v4
+      with:
+        package: ${{ inputs.package }}
+        build-name: ${{ inputs.build-name }}
+        os: ${{ steps.discovery.outputs.OS }}
+        arch: ${{ steps.discovery.outputs.ARCH }}
+        tag: ${{ steps.discovery.outputs.TAG }}
+        is-tag: ${{ steps.discovery.outputs.IS_TAG }}
+        short-sha: ${{ steps.discovery.outputs.SHORT_SHA }}

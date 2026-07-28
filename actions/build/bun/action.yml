@@ -1,0 +1,93 @@
+name: "Bun (full pipeline)"
+description: >
+  Bun toolchain, build and packaging for a JavaScript or TypeScript project.
+
+  Its own stack rather than a flag on Node: bun installs from its own lockfile
+  and runs scripts through its own runtime, so a project that chose bun and a
+  project that chose npm resolve different trees from the same package.json.
+
+  framework/ is deliberately empty for now. The frameworks bun runs — Astro,
+  Vite and the rest — build identically under it, so an adapter would only
+  restate the Node one. When one genuinely differs under bun, that is when it
+  earns a directory.
+
+inputs:
+  build:
+    description: "Whether to run the build"
+    required: false
+    default: "true"
+  package:
+    description: "Upload the built output as an artifact, and release on a tag"
+    required: false
+    default: "true"
+  build-name:
+    description: "Base name for the artifact"
+    required: true
+  bun-version:
+    description: "Bun version to install"
+    required: false
+    default: "latest"
+  build-script:
+    description: "Script to run with `bun run`"
+    required: false
+    default: "build"
+  build-args:
+    description: "Extra arguments passed to the script"
+    required: false
+    default: ""
+  output-directory:
+    description: "Override where the build is expected to write"
+    required: false
+    default: ""
+  install:
+    description: "Install dependencies before building"
+    required: false
+    default: "true"
+  app-working-directory:
+    description: "Directory holding package.json"
+    required: false
+    default: "."
+
+outputs:
+  SELECTED_STACK:
+    description: "Always bun; lets the orchestrator report what it chose"
+    value: "bun"
+  OUTPUT_PATH:
+    description: "Directory the build wrote, relative to the working directory"
+    value: ${{ steps.build.outputs.OUTPUT_PATH }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Discovery
+      id: discovery
+      uses: dAppCore/build/actions/discovery@v4
+      with:
+        working-directory: ${{ inputs.app-working-directory }}
+
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: ${{ inputs.bun-version }}
+
+    - name: Build
+      id: build
+      uses: dAppCore/build/actions/build/bun/build@v4
+      with:
+        build: ${{ inputs.build }}
+        app-working-directory: ${{ inputs.app-working-directory }}
+        build-script: ${{ inputs.build-script }}
+        build-args: ${{ inputs.build-args }}
+        output-directory: ${{ inputs.output-directory }}
+        install: ${{ inputs.install }}
+
+    - name: Package & release
+      uses: dAppCore/build/actions/package@v4
+      with:
+        package: ${{ inputs.package }}
+        build-name: ${{ inputs.build-name }}
+        os: ${{ steps.discovery.outputs.OS }}
+        arch: ${{ steps.discovery.outputs.ARCH }}
+        tag: ${{ steps.discovery.outputs.TAG }}
+        is-tag: ${{ steps.discovery.outputs.IS_TAG }}
+        short-sha: ${{ steps.discovery.outputs.SHORT_SHA }}

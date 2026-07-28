@@ -67,8 +67,20 @@ Useful on pull requests, where you want to know it compiles and nothing more.
 
 ## Pinning
 
-`@v4` is a moving tag: it follows the latest v4 release, which is what most
-workflows want. Pin an exact version when you would rather choose your upgrades:
+Three levels, so you choose how much movement you want:
+
+| | |
+| :-- | :-- |
+| `@v4` | the newest v4 release — the usual choice |
+| `@v4.2` | the newest v4.2.x — bug fixes, no new behaviour |
+| `@v4.2.0` | never moves |
+
+```yaml
+- uses: dAppCore/build@v4.2.0
+```
+
+The floating tags only move when a release is cut, never on a commit to
+`main`, so `main` running ahead of them is normal.
 
 ```yaml
 - uses: dAppCore/build@v4.1.0

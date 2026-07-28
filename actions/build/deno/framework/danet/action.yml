@@ -1,0 +1,57 @@
+name: "Danet (Deno)"
+description: >
+  Danet is a Nest-shaped backend framework for Deno, built on Hono.
+
+  Its starter defines `launch-server` and `test` and no build task at all,
+  which is honest — a Deno server has nothing to bundle. So the artifact is a
+  `deno compile` binary, and the two things this adapter knows are the entry
+  file the CLI generates (run.ts) and the permission set the starter runs with:
+  net, read and env. Those have to be right at compile time because a compiled
+  binary cannot be granted more later.
+
+inputs:
+  build:
+    description: "Whether to run the build"
+    required: false
+    default: "true"
+  app-working-directory:
+    description: "Directory holding deno.json"
+    required: false
+    default: "."
+  build-name:
+    description: "Name of the compiled binary"
+    required: true
+  entry:
+    description: "Entry module. Defaults to run.ts, which is what the Danet CLI generates."
+    required: false
+    default: "run.ts"
+  permissions:
+    description: "Permission flags baked into the binary"
+    required: false
+    default: "--allow-net --allow-read --allow-env"
+  output-directory:
+    description: "Where the binary is written"
+    required: false
+    default: "bin"
+
+outputs:
+  BINARY_PATH:
+    description: "Path to the compiled binary"
+    value: ${{ steps.build.outputs.BINARY_PATH }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Compile
+      id: build
+      uses: dAppCore/build/actions/build/deno/build@v4
+      with:
+        build: ${{ inputs.build }}
+        app-working-directory: ${{ inputs.app-working-directory }}
+        build-name: ${{ inputs.build-name }}
+        entry: ${{ inputs.entry }}
+        permissions: ${{ inputs.permissions }}
+        output-directory: ${{ inputs.output-directory }}
+        # Danet has no build task; compiling is the build. Naming it here stops
+        # an unrelated `build` task in someone's deno.json being mistaken for one.
+        build-task: ""

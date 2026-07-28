@@ -1,0 +1,47 @@
+{
+  "version": "5",
+  "specifiers": {
+    "jsr:@danet/core@2": "2.11.3",
+    "jsr:@danet/validatte@0.7.4": "0.7.4",
+    "jsr:@dx/reflect@0.2.14": "0.2.14",
+    "jsr:@hono/hono@4.6.3": "4.6.3",
+    "jsr:@std/fmt@0.223.0": "0.223.0",
+    "npm:awesome-phonenumber@7.1.0": "7.1.0"
+  },
+  "jsr": {
+    "@danet/core@2.11.3": {
+      "integrity": "d64b7060aeaebc59e4f3b2519daf1425bf788e6985f8e2392f66bb5def9ebf2f",
+      "dependencies": [
+        "jsr:@danet/validatte",
+        "jsr:@dx/reflect",
+        "jsr:@hono/hono",
+        "jsr:@std/fmt"
+      ]
+    },
+    "@danet/validatte@0.7.4": {
+      "integrity": "338bca670a5af1dd42214fcde0912de37d9a9d3ce1415cd2abdb6b1c27c46f89",
+      "dependencies": [
+        "npm:awesome-phonenumber"
+      ]
+    },
+    "@dx/reflect@0.2.14": {
+      "integrity": "53e1cb54e25170f43d90966679fcd7d6e0d27e23f4f1c869330d339576f446be"
+    },
+    "@hono/hono@4.6.3": {
+      "integrity": "a1f5a18cd12a0db54755b0461dd5a4e2d93a6f85403073eb710103eacc42daf3"
+    },
+    "@std/fmt@0.223.0": {
+      "integrity": "6deb37794127dfc7d7bded2586b9fc6f5d50e62a8134846608baf71ffc1a5208"
+    }
+  },
+  "npm": {
+    "awesome-phonenumber@7.1.0": {
+      "integrity": "sha512-i/pC5xvaNVrduufGtnw8O+abLWq70wd6YutiPYR2NqrnwtjBMk7rG/vJTktnAivSok+ZqlkFZzuVICgObpQi4w=="
+    }
+  },
+  "workspace": {
+    "dependencies": [
+      "jsr:@danet/core@2"
+    ]
+  }
+}

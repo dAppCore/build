@@ -1,0 +1,112 @@
+name: "Build Node project"
+description: >
+  Installs dependencies and runs the project's build script.
+
+  The framework adapters all end up here: they differ in what they know about a
+  framework's output directory and script name, not in how npm is invoked. So
+  the invocation lives in one place and the knowledge lives in the adapters.
+
+inputs:
+  build:
+    description: "Whether to run the build"
+    required: false
+    default: "true"
+  app-working-directory:
+    description: "Directory holding package.json"
+    required: false
+    default: "."
+  build-script:
+    description: "npm script to run"
+    required: false
+    default: "build"
+  build-args:
+    description: "Extra arguments passed after --"
+    required: false
+    default: ""
+  output-directory:
+    description: >
+      Where the build writes. Empty asks the adapter's candidates to be
+      searched, which is what a plain Node project without a framework gets.
+    required: false
+    default: ""
+  output-candidates:
+    description: "Space-separated directories to look for when output-directory is empty"
+    required: false
+    default: "dist build out .output public"
+  install:
+    description: "Run npm ci before building"
+    required: false
+    default: "true"
+
+outputs:
+  OUTPUT_PATH:
+    description: "Directory the build wrote, relative to the working directory"
+    value: ${{ steps.build.outputs.OUTPUT_PATH }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install dependencies
+      if: inputs.build == 'true' && inputs.install == 'true'
+      shell: bash
+      working-directory: ${{ inputs.app-working-directory }}
+      run: |
+        set -euo pipefail
+        # ci is reproducible and needs a lockfile; install is the fallback for a
+        # project that has not committed one.
+        if [ -f package-lock.json ]; then
+          npm ci
+        else
+          echo "::notice::no package-lock.json — falling back to npm install"
+          npm install
+        fi
+
+    - name: Build
+      id: build
+      if: inputs.build == 'true'
+      shell: bash
+      working-directory: ${{ inputs.app-working-directory }}
+      env:
+        SCRIPT: ${{ inputs.build-script }}
+        EXTRA: ${{ inputs.build-args }}
+        OUT: ${{ inputs.output-directory }}
+        CANDIDATES: ${{ inputs.output-candidates }}
+      run: |
+        set -euo pipefail
+
+        if ! node -e "process.exit(require('./package.json').scripts?.['$SCRIPT'] ? 0 : 1)"; then
+          echo "::error::package.json has no \"$SCRIPT\" script"
+          exit 1
+        fi
+
+        before="$(mktemp)"
+        ls -1A > "$before"
+
+        if [ -n "$EXTRA" ]; then
+          npm run "$SCRIPT" -- $EXTRA
+        else
+          npm run "$SCRIPT"
+        fi
+
+        out="$OUT"
+        if [ -z "$out" ]; then
+          # An adapter that knows its framework passes output-directory. Without
+          # one, prefer a directory the build itself created — that is evidence,
+          # where matching a name is a guess.
+          for c in $CANDIDATES; do
+            if [ -d "$c" ] && ! grep -qx "$c" "$before"; then out="$c"; break; fi
+          done
+        fi
+        if [ -z "$out" ]; then
+          for c in $CANDIDATES; do
+            if [ -d "$c" ]; then out="$c"; break; fi
+          done
+        fi
+        if [ -z "$out" ]; then
+          echo "::error::the build produced no directory among: $CANDIDATES. Set output-directory."
+          ls -la
+          exit 1
+        fi
+
+        echo "[DEBUG_LOG] (node) output=$out"
+        echo "OUTPUT_PATH=$out" >> "$GITHUB_OUTPUT"

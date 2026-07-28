@@ -1,0 +1,51 @@
+name: "Vite (Node)"
+description: >
+  Vite and everything built on it — React, Vue, Svelte, Solid via the standard
+  templates — write to dist. The framework in the source tree does not change
+  the build; the bundler does.
+
+inputs:
+  build:
+    description: "Whether to run the build"
+    required: false
+    default: "true"
+  app-working-directory:
+    description: "Directory holding package.json"
+    required: false
+    default: "."
+  build-script:
+    description: "npm script to run"
+    required: false
+    default: "build"
+  build-args:
+    description: "Extra arguments passed after --"
+    required: false
+    default: ""
+  output-directory:
+    description: "Override the framework's usual output directory"
+    required: false
+    default: ""
+  install:
+    description: "Run npm ci before building"
+    required: false
+    default: "true"
+
+outputs:
+  OUTPUT_PATH:
+    description: "Directory the build wrote, relative to the working directory"
+    value: ${{ steps.build.outputs.OUTPUT_PATH }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Build
+      id: build
+      uses: dAppCore/build/actions/build/node/build@v4
+      with:
+        build: ${{ inputs.build }}
+        app-working-directory: ${{ inputs.app-working-directory }}
+        build-script: ${{ inputs.build-script }}
+        build-args: ${{ inputs.build-args }}
+        install: ${{ inputs.install }}
+        output-directory: ${{ inputs.output-directory }}
+        output-candidates: "dist"

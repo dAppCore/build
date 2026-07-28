@@ -1,0 +1,55 @@
+name: "Angular (Node)"
+description: >
+  Angular writes to dist/<project-name>, so the candidate is dist and the real
+  path is whatever appeared beneath it. base-href is the input worth having:
+  a project page served from a subdirectory is broken without it, and the
+  failure looks like a blank screen rather than a build error.
+
+inputs:
+  build:
+    description: "Whether to run the build"
+    required: false
+    default: "true"
+  app-working-directory:
+    description: "Directory holding package.json"
+    required: false
+    default: "."
+  build-script:
+    description: "npm script to run"
+    required: false
+    default: "build"
+  build-args:
+    description: "Extra arguments passed after --"
+    required: false
+    default: ""
+  output-directory:
+    description: "Override the framework's usual output directory"
+    required: false
+    default: ""
+  install:
+    description: "Run npm ci before building"
+    required: false
+    default: "true"
+  base-href:
+    description: "Passed to ng build --base-href. Required for a site served from a subdirectory."
+    required: false
+    default: ""
+outputs:
+  OUTPUT_PATH:
+    description: "Directory the build wrote, relative to the working directory"
+    value: ${{ steps.build.outputs.OUTPUT_PATH }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Build
+      id: build
+      uses: dAppCore/build/actions/build/node/build@v4
+      with:
+        build: ${{ inputs.build }}
+        app-working-directory: ${{ inputs.app-working-directory }}
+        build-script: ${{ inputs.build-script }}
+        build-args: ${{ inputs.base-href && format(--base-href {0} {1}, inputs.base-href, inputs.build-args) || inputs.build-args }}
+        install: ${{ inputs.install }}
+        output-directory: ${{ inputs.output-directory }}
+        output-candidates: "dist"

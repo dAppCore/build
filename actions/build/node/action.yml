@@ -1,0 +1,182 @@
+name: "Node (full pipeline)"
+description: >
+  Node toolchain, framework dispatch, build and packaging for a JavaScript or
+  TypeScript project.
+
+  Runtime and framework are two questions, not one. This is the Node runtime;
+  bun and deno are their own stacks because they install and invoke
+  differently. Within it, framework/<name> knows one thing each — where that
+  framework writes and what it needs on the command line — and delegates the
+  npm invocation to a single place rather than repeating it.
+
+  TypeScript is not a stack here. Whether tsc runs is a detail of the
+  project's own build script, and every framework below handles it already.
+
+inputs:
+  build:
+    description: "Whether to run the build"
+    required: false
+    default: "true"
+  package:
+    description: "Upload the built output as an artifact, and release on a tag"
+    required: false
+    default: "true"
+  build-name:
+    description: "Base name for the artifact"
+    required: true
+  framework:
+    description: >
+      Framework adapter to use. Empty takes discovery's answer; `none` forces
+      the plain path.
+    required: false
+    default: ""
+  node-version:
+    description: "Node.js version to install"
+    required: false
+    default: "22"
+  build-script:
+    description: "npm script to run"
+    required: false
+    default: "build"
+  build-args:
+    description: "Extra arguments passed after --"
+    required: false
+    default: ""
+  base-href:
+    description: "Angular only — passed to ng build --base-href"
+    required: false
+    default: ""
+  output-directory:
+    description: "Override where the build is expected to write"
+    required: false
+    default: ""
+  install:
+    description: "Install dependencies before building"
+    required: false
+    default: "true"
+  app-working-directory:
+    description: "Directory holding package.json"
+    required: false
+    default: "."
+
+outputs:
+  SELECTED_STACK:
+    description: "Always node; lets the orchestrator report what it chose"
+    value: "node"
+  FRAMEWORK:
+    description: "The framework adapter that ran, or `none`"
+    value: ${{ steps.fw.outputs.FRAMEWORK }}
+  OUTPUT_PATH:
+    description: "Directory the build wrote, relative to the working directory"
+    value: ${{ steps.angular.outputs.OUTPUT_PATH || steps.astro.outputs.OUTPUT_PATH || steps.next.outputs.OUTPUT_PATH || steps.vite.outputs.OUTPUT_PATH || steps.plain.outputs.OUTPUT_PATH }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Discovery
+      id: discovery
+      uses: dAppCore/build/actions/discovery@v4
+      with:
+        working-directory: ${{ inputs.app-working-directory }}
+
+    - name: Setup Node
+      uses: dAppCore/build/actions/setup/npm@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+        working-directory: ${{ inputs.app-working-directory }}
+        install: 'false'
+
+    - name: Resolve the framework
+      id: fw
+      shell: bash
+      env:
+        REQUESTED: ${{ inputs.framework }}
+        DETECTED: ${{ steps.discovery.outputs.JS_FRAMEWORK }}
+      run: |
+        set -euo pipefail
+        FRAMEWORK="${REQUESTED:-$DETECTED}"
+        # An unrecognised framework is not an error: most JavaScript projects
+        # define a build script, and running it is a better answer than
+        # refusing until somebody writes an adapter.
+        case "$FRAMEWORK" in
+          angular|astro|next|vite) ;;
+          none|"") FRAMEWORK="none" ;;
+          *)
+            echo "::notice::no adapter for '$FRAMEWORK'; using the plain build script"
+            FRAMEWORK="none"
+            ;;
+        esac
+        echo "[DEBUG_LOG] (node) framework=$FRAMEWORK"
+        echo "FRAMEWORK=$FRAMEWORK" >> "$GITHUB_OUTPUT"
+
+    - name: Angular
+      id: angular
+      if: steps.fw.outputs.FRAMEWORK == 'angular'
+      uses: dAppCore/build/actions/build/node/framework/angular@v4
+      with:
+        build: ${{ inputs.build }}
+        app-working-directory: ${{ inputs.app-working-directory }}
+        build-script: ${{ inputs.build-script }}
+        build-args: ${{ inputs.build-args }}
+        base-href: ${{ inputs.base-href }}
+        output-directory: ${{ inputs.output-directory }}
+        install: ${{ inputs.install }}
+
+    - name: Astro
+      id: astro
+      if: steps.fw.outputs.FRAMEWORK == 'astro'
+      uses: dAppCore/build/actions/build/node/framework/astro@v4
+      with:
+        build: ${{ inputs.build }}
+        app-working-directory: ${{ inputs.app-working-directory }}
+        build-script: ${{ inputs.build-script }}
+        build-args: ${{ inputs.build-args }}
+        output-directory: ${{ inputs.output-directory }}
+        install: ${{ inputs.install }}
+
+    - name: Next.js
+      id: next
+      if: steps.fw.outputs.FRAMEWORK == 'next'
+      uses: dAppCore/build/actions/build/node/framework/next@v4
+      with:
+        build: ${{ inputs.build }}
+        app-working-directory: ${{ inputs.app-working-directory }}
+        build-script: ${{ inputs.build-script }}
+        build-args: ${{ inputs.build-args }}
+        output-directory: ${{ inputs.output-directory }}
+        install: ${{ inputs.install }}
+
+    - name: Vite
+      id: vite
+      if: steps.fw.outputs.FRAMEWORK == 'vite'
+      uses: dAppCore/build/actions/build/node/framework/vite@v4
+      with:
+        build: ${{ inputs.build }}
+        app-working-directory: ${{ inputs.app-working-directory }}
+        build-script: ${{ inputs.build-script }}
+        build-args: ${{ inputs.build-args }}
+        output-directory: ${{ inputs.output-directory }}
+        install: ${{ inputs.install }}
+
+    - name: Plain build script
+      id: plain
+      if: steps.fw.outputs.FRAMEWORK == 'none'
+      uses: dAppCore/build/actions/build/node/build@v4
+      with:
+        build: ${{ inputs.build }}
+        app-working-directory: ${{ inputs.app-working-directory }}
+        build-script: ${{ inputs.build-script }}
+        build-args: ${{ inputs.build-args }}
+        output-directory: ${{ inputs.output-directory }}
+        install: ${{ inputs.install }}
+
+    - name: Package & release
+      uses: dAppCore/build/actions/package@v4
+      with:
+        package: ${{ inputs.package }}
+        build-name: ${{ inputs.build-name }}
+        os: ${{ steps.discovery.outputs.OS }}
+        arch: ${{ steps.discovery.outputs.ARCH }}
+        tag: ${{ steps.discovery.outputs.TAG }}
+        is-tag: ${{ steps.discovery.outputs.IS_TAG }}
+        short-sha: ${{ steps.discovery.outputs.SHORT_SHA }}

@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
+  },
+  "imports": {
+    "@danet/core": "jsr:@danet/core@2"
+  },
+  "tasks": {
+    "launch-server": "deno run --allow-net --allow-read --allow-env run.ts"
+  }
+}

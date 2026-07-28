@@ -72,7 +72,7 @@ runs:
         # worse than failing. Every value that reaches here must have a wrapper
         # below; this catches the gap at the point it is introduced.
         case "$sel_stack" in
-          wails2|wails3|go|cpp|core) ;;
+          wails2|wails3|go|cpp|core|node|bun|deno) ;;
           *)
             echo "::error::no wrapper for stack '$sel_stack' — nothing would be built"
             exit 1
@@ -121,6 +121,34 @@ runs:
     - name: Call C++ wrapper
       if: steps.sel.outputs.SELECTED_STACK == 'cpp'
       uses: dAppCore/build/actions/build/cpp@v4
+      with:
+        build: ${{ inputs.build }}
+        sign: ${{ inputs.sign }}
+        package: ${{ inputs.package }}
+        build-name: ${{ inputs.build-name }}
+        app-working-directory: ${{ inputs.app-working-directory }}
+
+    - name: Call Node wrapper
+      if: steps.sel.outputs.SELECTED_STACK == 'node'
+      uses: dAppCore/build/actions/build/node@v4
+      with:
+        build: ${{ inputs.build }}
+        package: ${{ inputs.package }}
+        build-name: ${{ inputs.build-name }}
+        app-working-directory: ${{ inputs.app-working-directory }}
+
+    - name: Call Bun wrapper
+      if: steps.sel.outputs.SELECTED_STACK == 'bun'
+      uses: dAppCore/build/actions/build/bun@v4
+      with:
+        build: ${{ inputs.build }}
+        package: ${{ inputs.package }}
+        build-name: ${{ inputs.build-name }}
+        app-working-directory: ${{ inputs.app-working-directory }}
+
+    - name: Call Deno wrapper
+      if: steps.sel.outputs.SELECTED_STACK == 'deno'
+      uses: dAppCore/build/actions/build/deno@v4
       with:
         build: ${{ inputs.build }}
         sign: ${{ inputs.sign }}

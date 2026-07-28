@@ -1,0 +1,109 @@
+name: "Build Deno project"
+description: >
+  Runs the project's build task, or compiles the entry point to a binary.
+
+  Deno has no bundle-to-dist step for a server, so `deno compile` is what a
+  build means here: one self-contained executable with its permissions baked
+  in. A project that defines its own `build` task gets that instead, because
+  the project knows better than this action does.
+
+inputs:
+  build:
+    description: "Whether to run the build"
+    required: false
+    default: "true"
+  app-working-directory:
+    description: "Directory holding deno.json"
+    required: false
+    default: "."
+  build-name:
+    description: "Name of the compiled binary"
+    required: true
+  entry:
+    description: "Entry module to compile. Empty looks for the usual names."
+    required: false
+    default: ""
+  permissions:
+    description: >
+      Permission flags baked into the binary. deno compile has no way to ask
+      later, so what is not granted here is denied at runtime.
+    required: false
+    default: "--allow-net --allow-read --allow-env"
+  build-task:
+    description: >
+      Task to run instead of compiling. Empty uses the project's `build` task
+      when it has one, and compiles when it does not.
+    required: false
+    default: ""
+  output-directory:
+    description: "Where the binary is written"
+    required: false
+    default: "bin"
+
+outputs:
+  BINARY_PATH:
+    description: "Path to the compiled binary, when compiling"
+    value: ${{ steps.build.outputs.BINARY_PATH }}
+  TASK_RUN:
+    description: "The task that ran, or `compile`"
+    value: ${{ steps.build.outputs.TASK_RUN }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Build
+      id: build
+      if: inputs.build == 'true'
+      shell: bash
+      working-directory: ${{ inputs.app-working-directory }}
+      env:
+        NAME: ${{ inputs.build-name }}
+        ENTRY: ${{ inputs.entry }}
+        PERMS: ${{ inputs.permissions }}
+        TASK: ${{ inputs.build-task }}
+        OUT_DIR: ${{ inputs.output-directory }}
+      run: |
+        set -euo pipefail
+
+        config=""
+        for c in deno.json deno.jsonc; do
+          if [ -f "$c" ]; then config="$c"; break; fi
+        done
+
+        task="$TASK"
+        if [ -z "$task" ] && [ -n "$config" ]; then
+          # A project that describes its own build is describing it for a
+          # reason; only fall back to compiling when it has not.
+          if deno task 2>/dev/null | grep -qE '^- build$'; then task="build"; fi
+        fi
+
+        if [ -n "$task" ]; then
+          echo "[DEBUG_LOG] (deno) deno task $task"
+          deno task "$task"
+          echo "TASK_RUN=$task" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
+        entry="$ENTRY"
+        if [ -z "$entry" ]; then
+          for candidate in run.ts main.ts mod.ts src/main.ts app.ts; do
+            if [ -f "$candidate" ]; then entry="$candidate"; break; fi
+          done
+        fi
+        if [ -z "$entry" ]; then
+          echo "::error::no entry module found (looked for run.ts, main.ts, mod.ts, src/main.ts, app.ts). Set entry."
+          exit 1
+        fi
+
+        ext=""
+        if [ "${RUNNER_OS}" = "Windows" ]; then ext=".exe"; fi
+        mkdir -p "$OUT_DIR"
+        binary="$OUT_DIR/$NAME$ext"
+
+        echo "[DEBUG_LOG] (deno) deno compile $PERMS -o $binary $entry"
+        deno compile $PERMS -o "$binary" "$entry"
+
+        test -f "$binary"
+        echo "[DEBUG_LOG] (deno) binary=$binary"
+        echo "BINARY_PATH=$binary" >> "$GITHUB_OUTPUT"
+        echo "TASK_RUN=compile" >> "$GITHUB_OUTPUT"

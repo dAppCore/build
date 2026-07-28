@@ -1,0 +1,99 @@
+name: "Build Bun project"
+description: >
+  Installs with bun and runs the project's build script.
+
+  Bun reads the same package.json as Node but installs from bun.lockb and runs
+  scripts through its own runtime, so a project that chose bun should be built
+  with bun — using npm here would resolve a different tree from the one the
+  developer tested.
+
+inputs:
+  build:
+    description: "Whether to run the build"
+    required: false
+    default: "true"
+  app-working-directory:
+    description: "Directory holding package.json"
+    required: false
+    default: "."
+  build-script:
+    description: "Script to run with `bun run`"
+    required: false
+    default: "build"
+  build-args:
+    description: "Extra arguments passed to the script"
+    required: false
+    default: ""
+  output-directory:
+    description: "Where the build writes. Empty searches the candidates."
+    required: false
+    default: ""
+  output-candidates:
+    description: "Space-separated directories to look for when output-directory is empty"
+    required: false
+    default: "dist build out .output public"
+  install:
+    description: "Run bun install before building"
+    required: false
+    default: "true"
+
+outputs:
+  OUTPUT_PATH:
+    description: "Directory the build wrote, relative to the working directory"
+    value: ${{ steps.build.outputs.OUTPUT_PATH }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install dependencies
+      if: inputs.build == 'true' && inputs.install == 'true'
+      shell: bash
+      working-directory: ${{ inputs.app-working-directory }}
+      run: |
+        set -euo pipefail
+        # --frozen-lockfile is bun's `npm ci`: reproducible, and it refuses
+        # rather than quietly resolving something else.
+        if [ -f bun.lockb ] || [ -f bun.lock ]; then
+          bun install --frozen-lockfile
+        else
+          echo "::notice::no bun lockfile — installing without one"
+          bun install
+        fi
+
+    - name: Build
+      id: build
+      if: inputs.build == 'true'
+      shell: bash
+      working-directory: ${{ inputs.app-working-directory }}
+      env:
+        SCRIPT: ${{ inputs.build-script }}
+        EXTRA: ${{ inputs.build-args }}
+        OUT: ${{ inputs.output-directory }}
+        CANDIDATES: ${{ inputs.output-candidates }}
+      run: |
+        set -euo pipefail
+
+        before="$(mktemp)"
+        ls -1A > "$before"
+
+        bun run "$SCRIPT" $EXTRA
+
+        out="$OUT"
+        if [ -z "$out" ]; then
+          for c in $CANDIDATES; do
+            if [ -d "$c" ] && ! grep -qx "$c" "$before"; then out="$c"; break; fi
+          done
+        fi
+        if [ -z "$out" ]; then
+          for c in $CANDIDATES; do
+            if [ -d "$c" ]; then out="$c"; break; fi
+          done
+        fi
+        if [ -z "$out" ]; then
+          echo "::error::the build produced no directory among: $CANDIDATES. Set output-directory."
+          ls -la
+          exit 1
+        fi
+
+        echo "[DEBUG_LOG] (bun) output=$out"
+        echo "OUTPUT_PATH=$out" >> "$GITHUB_OUTPUT"

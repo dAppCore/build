@@ -142,6 +142,40 @@ runs:
         if [ -n "$go_mod_path" ] && grep -qE 'wails/v3' "$go_mod_path" 2>/dev/null; then
           has_wails_v3=1
         fi
+        # The JavaScript runtime is decided by the lockfile, because that is the
+        # one file that says which tool actually installed the tree. A
+        # package.json is common to all three and settles nothing.
+        js_runtime=""
+        if [ -f "deno.json" ] || [ -f "deno.jsonc" ] || [ -f "deno.lock" ]; then
+          js_runtime="deno"
+        elif [ -f "bun.lockb" ] || [ -f "bun.lock" ]; then
+          js_runtime="bun"
+        elif [ "$has_root_pkg" -eq 1 ]; then
+          js_runtime="node"
+        fi
+
+        # The framework is a separate question from the runtime — the same
+        # framework runs under more than one — so it is detected separately and
+        # reported separately.
+        js_framework=""
+        if [ "$js_runtime" = "deno" ]; then
+          # Deno frameworks declare themselves in the import map rather than in
+          # a config file of their own.
+          for c in deno.json deno.jsonc; do
+            [ -f "$c" ] || continue
+            if grep -q '@danet/core' "$c" 2>/dev/null; then js_framework="danet"; fi
+            break
+          done
+        elif [ -n "$js_runtime" ]; then
+          if [ -f "angular.json" ]; then js_framework="angular"
+          elif ls astro.config.* >/dev/null 2>&1; then js_framework="astro"
+          elif ls next.config.* >/dev/null 2>&1; then js_framework="next"
+          elif ls nuxt.config.* >/dev/null 2>&1; then js_framework="nuxt"
+          elif ls svelte.config.* >/dev/null 2>&1; then js_framework="svelte"
+          elif ls vite.config.* >/dev/null 2>&1; then js_framework="vite"
+          fi
+        fi
+
         # A module that produces a command is a different job from a module that
         # is a library: one wants a binary and an artifact, the other wants vet
         # and tests. `main.go` at the root is the simple case; cmd/<name>/main.go
@@ -162,6 +196,8 @@ runs:
           suggestion="core"
         elif [ "$has_cmake" -eq 1 ]; then
           suggestion="cpp"
+        elif [ -n "$js_runtime" ]; then
+          suggestion="$js_runtime"
         fi
         # Output and logs
         echo "[DEBUG_LOG] HAS_ROOT_PACKAGE_JSON=$has_root_pkg"
@@ -169,6 +205,8 @@ runs:
         echo "[DEBUG_LOG] HAS_ROOT_GO_MOD=$has_go_mod"
         echo "[DEBUG_LOG] HAS_ROOT_MAIN_GO=$has_main_go"
         echo "[DEBUG_LOG] HAS_GO_MAIN_PACKAGE=$has_go_main"
+        echo "[DEBUG_LOG] JS_RUNTIME=${js_runtime:-none}"
+        echo "[DEBUG_LOG] JS_FRAMEWORK=${js_framework:-none}"
         echo "[DEBUG_LOG] HAS_ROOT_CMAKELISTS=$has_cmake"
         echo "[DEBUG_LOG] HAS_ROOT_MKDOCS=$has_mkdocs"
         echo "[DEBUG_LOG] HAS_SUB_NPM=$has_sub_npm"
@@ -180,6 +218,8 @@ runs:
         echo "HAS_ROOT_GO_MOD=$has_go_mod" >> "$GITHUB_OUTPUT"
         echo "HAS_ROOT_MAIN_GO=$has_main_go" >> "$GITHUB_OUTPUT"
         echo "HAS_GO_MAIN_PACKAGE=$has_go_main" >> "$GITHUB_OUTPUT"
+        echo "JS_RUNTIME=$js_runtime" >> "$GITHUB_OUTPUT"
+        echo "JS_FRAMEWORK=$js_framework" >> "$GITHUB_OUTPUT"
         echo "HAS_ROOT_CMAKELISTS=$has_cmake" >> "$GITHUB_OUTPUT"
         echo "HAS_ROOT_MKDOCS=$has_mkdocs" >> "$GITHUB_OUTPUT"
         echo "HAS_SUB_NPM=$has_sub_npm" >> "$GITHUB_OUTPUT"
@@ -214,6 +254,31 @@ runs:
         # Wails v3 declares itself in the module — the only marker that
         # separates it from v2 without guessing.
         if ($go_mod_path -ne "" -and (Select-String -Path $go_mod_path -Pattern 'wails/v3' -Quiet -ErrorAction SilentlyContinue)) { $has_wails_v3=1 }
+        # Runtime from the lockfile; a package.json is common to all three.
+        $js_runtime = ""
+        if ((Test-Path deno.json) -or (Test-Path deno.jsonc) -or (Test-Path deno.lock)) { $js_runtime = "deno" }
+        elseif ((Test-Path bun.lockb) -or (Test-Path bun.lock)) { $js_runtime = "bun" }
+        elseif ($has_root_pkg -eq 1) { $js_runtime = "node" }
+
+        # Framework is a separate axis from runtime.
+        $js_framework = ""
+        if ($js_runtime -eq "deno") {
+          foreach ($c in @("deno.json","deno.jsonc")) {
+            if (Test-Path $c) {
+              if (Select-String -Path $c -Pattern '@danet/core' -Quiet -ErrorAction SilentlyContinue) { $js_framework = "danet" }
+              break
+            }
+          }
+        }
+        elseif ($js_runtime -ne "") {
+          if (Test-Path angular.json) { $js_framework = "angular" }
+          elseif (Get-ChildItem -Filter "astro.config.*" -ErrorAction SilentlyContinue) { $js_framework = "astro" }
+          elseif (Get-ChildItem -Filter "next.config.*" -ErrorAction SilentlyContinue) { $js_framework = "next" }
+          elseif (Get-ChildItem -Filter "nuxt.config.*" -ErrorAction SilentlyContinue) { $js_framework = "nuxt" }
+          elseif (Get-ChildItem -Filter "svelte.config.*" -ErrorAction SilentlyContinue) { $js_framework = "svelte" }
+          elseif (Get-ChildItem -Filter "vite.config.*" -ErrorAction SilentlyContinue) { $js_framework = "vite" }
+        }
+
         # A module producing a command is a different job from a library one.
         $has_go_main = $has_main_go
         if ($has_go_main -eq 0) {
@@ -230,11 +295,14 @@ runs:
         elseif (($has_go_mod -eq 1) -and ($has_go_main -eq 1)) { $suggestion = "go" }
         elseif ($has_go_mod -eq 1) { $suggestion = "core" }
         elseif ($has_cmake -eq 1) { $suggestion = "cpp" }
+        elseif ($js_runtime -ne "") { $suggestion = $js_runtime }
         Write-Host "[DEBUG_LOG] HAS_ROOT_PACKAGE_JSON=$has_root_pkg"
         Write-Host "[DEBUG_LOG] HAS_FRONTEND_PACKAGE_JSON=$has_frontend_pkg"
         Write-Host "[DEBUG_LOG] HAS_ROOT_GO_MOD=$has_go_mod"
         Write-Host "[DEBUG_LOG] HAS_ROOT_MAIN_GO=$has_main_go"
         Write-Host "[DEBUG_LOG] HAS_GO_MAIN_PACKAGE=$has_go_main"
+        Write-Host "[DEBUG_LOG] JS_RUNTIME=$js_runtime"
+        Write-Host "[DEBUG_LOG] JS_FRAMEWORK=$js_framework"
         Write-Host "[DEBUG_LOG] HAS_ROOT_CMAKELISTS=$has_cmake"
         Write-Host "[DEBUG_LOG] HAS_ROOT_MKDOCS=$has_mkdocs"
         Write-Host "[DEBUG_LOG] HAS_SUB_NPM=$has_sub_npm"
@@ -245,6 +313,8 @@ runs:
         "HAS_ROOT_GO_MOD=$has_go_mod" >> $Env:GITHUB_OUTPUT
         "HAS_ROOT_MAIN_GO=$has_main_go" >> $Env:GITHUB_OUTPUT
         "HAS_GO_MAIN_PACKAGE=$has_go_main" >> $Env:GITHUB_OUTPUT
+        "JS_RUNTIME=$js_runtime" >> $Env:GITHUB_OUTPUT
+        "JS_FRAMEWORK=$js_framework" >> $Env:GITHUB_OUTPUT
         "HAS_ROOT_CMAKELISTS=$has_cmake" >> $Env:GITHUB_OUTPUT
         "HAS_ROOT_MKDOCS=$has_mkdocs" >> $Env:GITHUB_OUTPUT
         "HAS_SUB_NPM=$has_sub_npm" >> $Env:GITHUB_OUTPUT
@@ -300,6 +370,12 @@ outputs:
   HAS_GO_MAIN_PACKAGE:
     description: "1 if the module produces a command — main.go at root, or cmd/*/main.go"
     value: ${{ steps.proj_bash.outputs.HAS_GO_MAIN_PACKAGE || steps.proj_pwsh.outputs.HAS_GO_MAIN_PACKAGE }}
+  JS_RUNTIME:
+    description: "JavaScript runtime from the lockfile: node, bun, deno, or empty"
+    value: ${{ steps.proj_bash.outputs.JS_RUNTIME || steps.proj_pwsh.outputs.JS_RUNTIME }}
+  JS_FRAMEWORK:
+    description: "Framework marker: angular, astro, next, nuxt, svelte, vite, danet, or empty"
+    value: ${{ steps.proj_bash.outputs.JS_FRAMEWORK || steps.proj_pwsh.outputs.JS_FRAMEWORK }}
   HAS_ROOT_CMAKELISTS:
     description: "1 if CMakeLists.txt at root of working-directory"
     value: ${{ steps.proj_bash.outputs.HAS_ROOT_CMAKELISTS || steps.proj_pwsh.outputs.HAS_ROOT_CMAKELISTS }}
@@ -313,7 +389,7 @@ outputs:
     description: "1 if a nested mkdocs.yml was found within depth 2"
     value: ${{ steps.proj_bash.outputs.HAS_SUB_MKDOCS || steps.proj_pwsh.outputs.HAS_SUB_MKDOCS }}
   PRIMARY_STACK_SUGGESTION:
-    description: "Computed primary stack suggestion (wails3/wails2/go/core/cpp/unknown)"
+    description: "Computed primary stack suggestion (wails3/wails2/go/core/cpp/node/bun/deno/unknown)"
     value: ${{ steps.proj_bash.outputs.PRIMARY_STACK_SUGGESTION || steps.proj_pwsh.outputs.PRIMARY_STACK_SUGGESTION }}
   FOUND_FILES:
     description: "Comma-separated summary of notable files found"
