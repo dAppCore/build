@@ -296,9 +296,10 @@ outputs:
     value: ${{ steps.proj_bash.outputs.HAS_ROOT_GO_MOD || steps.proj_pwsh.outputs.HAS_ROOT_GO_MOD }}
   HAS_ROOT_MAIN_GO:
     description: "1 if main.go at root of working-directory"
+    value: ${{ steps.proj_bash.outputs.HAS_ROOT_MAIN_GO || steps.proj_pwsh.outputs.HAS_ROOT_MAIN_GO }}
   HAS_GO_MAIN_PACKAGE:
     description: "1 if the module produces a command — main.go at root, or cmd/*/main.go"
-    value: ${{ steps.proj_bash.outputs.HAS_ROOT_MAIN_GO || steps.proj_pwsh.outputs.HAS_ROOT_MAIN_GO }}
+    value: ${{ steps.proj_bash.outputs.HAS_GO_MAIN_PACKAGE || steps.proj_pwsh.outputs.HAS_GO_MAIN_PACKAGE }}
   HAS_ROOT_CMAKELISTS:
     description: "1 if CMakeLists.txt at root of working-directory"
     value: ${{ steps.proj_bash.outputs.HAS_ROOT_CMAKELISTS || steps.proj_pwsh.outputs.HAS_ROOT_CMAKELISTS }}

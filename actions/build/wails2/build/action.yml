@@ -6,13 +6,17 @@ inputs:
     required: false
     default: "true"
   app-working-directory:
+    description: "Root of the app being built"
     required: false
     default: "."
   build-platform:
+    description: "Target platform, e.g. linux/amd64, windows/amd64, darwin/universal"
     required: true
   build-name:
+    description: "Base name for the binary, bundle and artifact"
     required: true
   wails-build-webview2:
+    description: "WebView2 bootstrapper strategy passed to wails build -webview2"
     required: false
     default: "download"
   build-options:

@@ -2,40 +2,52 @@ name: "Sign"
 description: "Unified signing for macOS and Windows (conditional by OS); notarizes on tags for macOS"
 inputs:
   sign:
+    description: "Sign the build where signing is configured"
     required: false
     default: "false"
   app-working-directory:
+    description: "Root of the app being built"
     required: false
     default: "."
   build-name:
+    description: "Base name for the binary, bundle and artifact"
     required: true
   # macOS
   sign-macos-apple-password:
+    description: "App-specific Apple ID password used for notarisation"
     required: false
     default: ''
   sign-macos-app-id:
+    description: "Developer ID Application identity, e.g. 'Developer ID Application: Name (TEAMID)'"
     required: false
     default: ''
   sign-macos-app-cert:
+    description: "Base64-encoded .p12 application signing certificate"
     required: false
     default: ''
   sign-macos-app-cert-password:
+    description: "Password for the application certificate"
     required: false
     default: ''
   sign-macos-installer-id:
+    description: "Developer ID Installer identity; empty builds an unsigned .pkg"
     required: false
     default: ''
   sign-macos-installer-cert:
+    description: "Base64-encoded .p12 installer signing certificate"
     required: false
     default: ''
   sign-macos-installer-cert-password:
+    description: "Password for the installer certificate"
     required: false
     default: ''
   # Windows
   sign-windows-cert:
+    description: "Base64-encoded .pfx signing certificate; empty skips Windows signing"
     required: false
     default: ''
   sign-windows-cert-password:
+    description: "Password for the Windows certificate"
     required: false
     default: ''
 runs:

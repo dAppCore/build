@@ -4,44 +4,44 @@ inputs:
   build:
     required: false
     default: "true"
-    description: ""
+    description: "Whether to run the build"
   sign:
     required: false
     default: "false"
-    description: ""
+    description: "Sign the build where signing is configured"
   package:
     required: false
     default: "true"
-    description: ""
+    description: "Upload artifacts, and publish a release on a tag"
   build-name:
     required: true
-    description: ""
+    description: "Base name for the binary, bundle and artifact"
   build-platform:
     required: false
     default: "darwin/universal"
-    description: ""
+    description: "Target platform, e.g. linux/amd64, windows/amd64, darwin/universal"
   app-working-directory:
     required: false
     default: "."
-    description: ""
+    description: "Root of the app being built"
   # Orchestrator controls
   AUTO_STACK:
     required: false
     default: "true"
-    description: ""
+    description: "Let discovery choose the stack"
   AUTO_SETUP:
     required: false
     default: "true"
-    description: ""
+    description: "Let the environment toggles enable setup steps"
   STACK:
     required: false
     default: ""
-    description: ""
+    description: "Name a stack and skip detection"
   # Optional hint from a prior discovery step
   PRIMARY_STACK_SUGGESTION:
     required: false
     default: ""
-    description: ""
+    description: "Stack hint from an earlier discovery step"
 runs:
   using: "composite"
   steps:

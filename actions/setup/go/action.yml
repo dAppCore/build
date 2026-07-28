@@ -2,18 +2,23 @@ name: "Setup Go (and Wails)"
 description: "Sets up Go (with optional cache), installs Garble when obfuscating, installs Wails CLI unless wails-dev-build is true; installs gon on macOS"
 inputs:
   go-version:
+    description: "Go version to install"
     required: false
     default: "1.23"
   build-cache:
+    description: "Enable the Go build cache"
     required: false
     default: "true"
   build-obfuscate:
+    description: "Build with Garble; installs it when true"
     required: false
     default: "false"
   wails-version:
+    description: "Wails v2 CLI version to install"
     required: false
     default: "latest"
   wails-dev-build:
+    description: "Skip installing the Wails CLI — for stacks that do not need it"
     required: false
     default: "false"
 runs:

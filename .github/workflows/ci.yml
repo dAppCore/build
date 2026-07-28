@@ -11,6 +11,21 @@ on:
   workflow_dispatch:
 
 jobs:
+  # Structural checks on every action.yml. These catch the mistakes that pass
+  # YAML validation and then fail quietly: an output declared without a value
+  # resolves to "" forever with nothing warning about it, which is how one
+  # misplaced line broke all seven discovery fixtures at once.
+  action-contracts:
+    name: Action contracts (outputs have values, inputs are described)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - run: pip install --quiet pyyaml
+      - run: python3 tests/action_contracts.py
+
   discovery-tests:
     name: Discovery sub-action tests on ${{ matrix.os }}
     strategy:
@@ -81,7 +96,7 @@ jobs:
 
   options-tests:
     name: Options sub-action matrix (Ubuntu)
-    needs: [discovery-tests,discovery-fixture-tests]
+    needs: [action-contracts, discovery-tests, discovery-fixture-tests]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -412,7 +427,7 @@ jobs:
 
   wails-env-mapping:
     name: WAILS_* env mapping (root action)
-    needs: [discovery-tests,discovery-fixture-tests]
+    needs: [action-contracts, discovery-tests, discovery-fixture-tests]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -437,7 +452,7 @@ jobs:
 
   wails-env-mapping-wrapper:
     name: WAILS_* env mapping (wrapper outputs)
-    needs: [discovery-tests,discovery-fixture-tests]
+    needs: [action-contracts, discovery-tests, discovery-fixture-tests]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

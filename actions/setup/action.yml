@@ -3,42 +3,54 @@ description: "Orchestrates language/tool setup by delegating to sub-actions: set
 inputs:
   # Go/Wails
   go-version:
+    description: "Go version to install"
     required: false
     default: "1.23"
   build-cache:
+    description: "Enable the Go build cache"
     required: false
     default: "true"
   build-obfuscate:
+    description: "Build with Garble; installs it when true"
     required: false
     default: "false"
   wails-version:
+    description: "Wails v2 CLI version to install"
     required: false
     default: "latest"
   wails-dev-build:
+    description: "Skip installing the Wails CLI — for stacks that do not need it"
     required: false
     default: "false"
   # Node/npm
   node-version:
+    description: "Node.js version to install"
     required: false
     default: "18.x"
   npm-working-directory:
+    description: "Directory holding the frontend package.json"
     required: false
     default: "."
   npm-install:
+    description: "Run npm ci in the frontend directory"
     required: false
     default: "true"
   # Deno
   deno-build:
+    description: "Deno command to run, e.g. 'deno task build'; empty skips Deno"
     required: false
     default: ""
   deno-version:
+    description: "Deno version to install, e.g. v1.44.x"
     required: false
     default: "v1.20.x"
   deno-working-directory:
+    description: "Directory to run the Deno command in"
     required: false
     default: "."
   # Conan (placeholder)
   conan-enable:
+    description: "Install Conan as part of setup"
     required: false
     default: "false"
 runs:

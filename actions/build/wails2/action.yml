@@ -71,39 +71,39 @@ inputs:
   sign-macos-app-id:
     required: false
     default: ''
-    description: ""
+    description: "Developer ID Application identity, e.g. 'Developer ID Application: Name (TEAMID)'"
   sign-macos-apple-password:
     required: false
     default: ''
-    description: ""
+    description: "App-specific Apple ID password used for notarisation"
   sign-macos-app-cert:
     required: false
     default: ''
-    description: ""
+    description: "Base64-encoded .p12 application signing certificate"
   sign-macos-app-cert-password:
     required: false
     default: ''
-    description: ""
+    description: "Password for the application certificate"
   sign-macos-installer-id:
     required: false
     default: ''
-    description: ""
+    description: "Developer ID Installer identity; empty builds an unsigned .pkg"
   sign-macos-installer-cert:
     required: false
     default: ''
-    description: ""
+    description: "Base64-encoded .p12 installer signing certificate"
   sign-macos-installer-cert-password:
     required: false
     default: ''
-    description: ""
+    description: "Password for the installer certificate"
   sign-windows-cert:
     required: false
     default: ''
-    description: ""
+    description: "Base64-encoded .pfx signing certificate; empty skips Windows signing"
   sign-windows-cert-password:
     required: false
     default: ''
-    description: ""
+    description: "Password for the Windows certificate"
   wails-dev-build:
     description: "Use provided wails binary instead of installing"
     required: false

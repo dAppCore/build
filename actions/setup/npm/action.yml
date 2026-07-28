@@ -2,12 +2,15 @@ name: "Setup Node and npm"
 description: "Installs Node.js and optionally installs dependencies (npm ci) in a detected project directory"
 inputs:
   node-version:
+    description: "Node.js version to install"
     required: false
     default: "18.x"
   working-directory:
+    description: "Directory to operate in"
     required: false
     default: "."
   install:
+    description: "Run npm ci after installing Node"
     required: false
     default: "true"
 runs:

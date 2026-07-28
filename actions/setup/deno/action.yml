@@ -2,12 +2,15 @@ name: "Setup Deno (ENV-first)"
 description: "Sets up Deno and optionally runs a Deno command; configuration comes from env first, then inputs"
 inputs:
   deno-build:
+    description: "Deno command to run, e.g. 'deno task build'; empty skips Deno"
     required: false
     default: ""
   deno-version:
+    description: "Deno version to install, e.g. v1.44.x"
     required: false
     default: "v1.20.x"
   deno-working-directory:
+    description: "Directory to run the Deno command in"
     required: false
     default: "."
 runs:

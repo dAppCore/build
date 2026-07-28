@@ -2,9 +2,11 @@ name: "Package & Release"
 description: "Uploads build artifacts and publishes GitHub Release on tag if enabled"
 inputs:
   package:
+    description: "Upload artifacts, and publish a release on a tag"
     required: false
     default: "true"
   build-name:
+    description: "Base name for the binary, bundle and artifact"
     required: true
   os:
     description: "OS name (optional, from discovery). Defaults to runner.os"
