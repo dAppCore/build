@@ -32,6 +32,18 @@ inputs:
     description: "Build tags to pass to Go compiler. Must be quoted. Space or comma (but not both) separated"
     required: false
     default: "false"
+  build-debug:
+    description: "Retain debug info and show the debug console"
+    required: false
+    default: "false"
+  build-ldflags:
+    description: "Additional ldflags for the Go compiler"
+    required: false
+    default: "false"
+  build-windowsconsole:
+    description: "Keep the console window on Windows builds"
+    required: false
+    default: "false"
   build-obfuscate:
     description: "Obfuscate (garble) the build"
     required: false
@@ -192,6 +204,9 @@ runs:
         build-obfuscate: ${{ steps.wcfg.outputs.OBFUSCATE }}
         build-tags: ${{ steps.wcfg.outputs.BUILD_TAGS }}
         nsis: ${{ steps.wcfg.outputs.NSIS }}
+        build-debug: ${{ inputs.build-debug }}
+        build-ldflags: ${{ inputs.build-ldflags }}
+        build-windowsconsole: ${{ inputs.build-windowsconsole }}
         distro: ${{ steps.discovery.outputs.DISTRO }}
 
     - name: Setup toolchains (Go/Node/Deno/Wails)

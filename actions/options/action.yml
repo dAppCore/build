@@ -5,6 +5,20 @@ inputs:
     description: "Obfuscate the build"
     required: false
     default: "false"
+  build-debug:
+    description: "Retain debug info and show the debug console"
+    required: false
+    default: "false"
+  build-ldflags:
+    description: >
+      Additional ldflags for the Go compiler. A YAML folded block is the
+      comfortable way to pass several — see the wails2 stack docs.
+    required: false
+    default: "false"
+  build-windowsconsole:
+    description: "Keep the console window on Windows builds"
+    required: false
+    default: "false"
   build-tags:
     description: "Build tags to pass to Go compiler. Space and/or comma separated."
     required: false
@@ -34,12 +48,27 @@ runs:
       env:
         DISTRO: ${{ inputs.distro }}
         DISABLE_WEBKIT: ${{ inputs.disable-webkit-auto-tag }}
+        LDFLAGS: ${{ inputs.build-ldflags }}
       run: |
         set -euo pipefail
         build_options=""
         # Obfuscation
         if ${{ inputs.build-obfuscate == 'true' }}; then
           build_options+=" -obfuscated"
+        fi
+        # Debug build
+        if ${{ inputs.build-debug == 'true' }}; then
+          build_options+=" -debug"
+        fi
+        # ldflags. Quoted as one argument because several flags separated by
+        # spaces are normal — that quoting is what made this work where an
+        # earlier attempt did not (Evan Sosenko, #44).
+        if [[ "${LDFLAGS}" != "false" && -n "${LDFLAGS}" ]]; then
+          build_options+=" -ldflags='${LDFLAGS}'"
+        fi
+        # Windows console
+        if ${{ inputs.build-windowsconsole == 'true' }}; then
+          build_options+=" -windowsconsole"
         fi
         # Normalize tags: accept commas and/or spaces, trim, de-duplicate
         norm_tags=""

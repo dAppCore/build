@@ -113,6 +113,12 @@ jobs:
           - { distro: '24.04', obf: 'false', nsis: 'false', tags: 'release,custom,custom', expect_webkit: 'true', expect_dedupe: 'custom' }
           - { distro: '24.04', obf: 'false', nsis: 'false', tags: 'release custom', expect_webkit: 'true', expect_dedupe: '' }
           - { distro: '24.04', obf: 'false', nsis: 'false', tags: 'false', expect_webkit: 'false', disable_webkit: 'true' }
+          # -debug, -ldflags and -windowsconsole, from #44. ldflags is quoted
+          # as one argument because several flags separated by spaces are the
+          # normal case.
+          - { distro: '22.04', obf: 'false', nsis: 'false', tags: 'false', expect_webkit: 'false', debug: 'true', expect_flag: '-debug' }
+          - { distro: '22.04', obf: 'false', nsis: 'false', tags: 'false', expect_webkit: 'false', windowsconsole: 'true', expect_flag: '-windowsconsole' }
+          - { distro: '22.04', obf: 'false', nsis: 'false', tags: 'false', expect_webkit: 'false', ldflags: '-X=main.Version=1.2.3 -s', expect_flag: "-ldflags='-X=main.Version=1.2.3 -s'" }
     steps:
       - uses: actions/checkout@v4
       - id: opts
@@ -123,6 +129,9 @@ jobs:
           nsis: ${{ matrix.nsis }}
           distro: ${{ matrix.distro }}
           disable-webkit-auto-tag: ${{ matrix.disable_webkit || 'false' }}
+          build-debug: ${{ matrix.debug || 'false' }}
+          build-windowsconsole: ${{ matrix.windowsconsole || 'false' }}
+          build-ldflags: ${{ matrix.ldflags || 'false' }}
       - name: Assert BUILD_OPTIONS
         shell: bash
         run: |
@@ -133,6 +142,12 @@ jobs:
           if [ "${{ matrix.nsis }}" = "true" ] && ! echo "$BO" | grep -q -- "-nsis"; then echo "missing -nsis"; exit 1; fi
           if [ "${{ matrix.expect_webkit }}" = "true" ] && ! echo "$BO" | grep -q -- "webkit2_41"; then echo "missing webkit2_41"; exit 1; fi
           if [ "${{ matrix.disable_webkit || 'false' }}" = "true" ] && echo "$BO" | grep -q -- "webkit2_41"; then echo "webkit2_41 should be disabled"; exit 1; fi
+          if [ -n "${{ matrix.expect_flag || '' }}" ]; then
+            case "$BO" in
+              *"${{ matrix.expect_flag }}"*) : ;;
+              *) echo "missing ${{ matrix.expect_flag }}"; exit 1 ;;
+            esac
+          fi
           if [ -n "${{ matrix.expect_dedupe || '' }}" ]; then
             count=$(echo "$BO" | grep -o -- "${{ matrix.expect_dedupe }}" | wc -l | tr -d ' ')
             if [ "$count" -ne 1 ]; then echo "expected tag '${{ matrix.expect_dedupe }}' to appear once, got $count"; exit 1; fi
