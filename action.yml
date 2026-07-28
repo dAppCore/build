@@ -128,3 +128,9 @@ outputs:
   SELECTED_STACK:
     description: "Stack selected by the orchestrator (via directory orchestrator)"
     value: ${{ steps.dir_orch.outputs.SELECTED_STACK }}
+  BINARY_PATH:
+    description: "Path to the built binary, relative to app-working-directory, for stacks that produce one"
+    value: ${{ steps.dir_orch.outputs.BINARY_PATH }}
+  OUTPUT_PATH:
+    description: "Directory the build wrote, relative to app-working-directory, for stacks that produce one"
+    value: ${{ steps.dir_orch.outputs.OUTPUT_PATH }}
