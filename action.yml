@@ -119,17 +119,11 @@ runs:
       shell: bash
       run: echo "[DEBUG_LOG] (root) Orchestrator selected stack=${{ steps.dir_orch.outputs.SELECTED_STACK }}"
 
-    - name: Package & release
-      uses: dAppCore/build/actions/package@v4
-      with:
-        package: ${{ inputs.package }}
-        build-name: ${{ inputs.build-name }}
-        os: ${{ steps.discovery.outputs.OS }}
-        arch: ${{ steps.discovery.outputs.ARCH }}
-        tag: ${{ steps.discovery.outputs.TAG }}
-        is-tag: ${{ steps.discovery.outputs.IS_TAG }}
-        short-sha: ${{ steps.discovery.outputs.SHORT_SHA }}
-        ref: ${{ steps.discovery.outputs.REF }}
+    # No packaging here. Every stack wrapper packages what it built, because
+    # only the stack knows what that is — a binary, a bundle, a dist directory,
+    # or in core's case nothing at all. This step used to run as well, so every
+    # build through the root action uploaded its artifact twice and, on a tag,
+    # attempted the release twice.
 outputs:
   SELECTED_STACK:
     description: "Stack selected by the orchestrator (via directory orchestrator)"
