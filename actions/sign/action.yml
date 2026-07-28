@@ -83,7 +83,10 @@ runs:
       working-directory: ${{ inputs.app-working-directory }}
       shell: bash
       run: |
-        ditto -c -k --keepParent ${{ inputs.app-working-directory }}/build/bin/${{ inputs.build-name }}.app ${{ inputs.app-working-directory }}/build/bin/${{ inputs.build-name }}.app.zip
+        # Paths are relative to working-directory, which is already
+        # app-working-directory — prefixing again asked ditto for
+        # <dir>/<dir>/build/bin. harrys522 spotted this in #46.
+        ditto -c -k --keepParent build/bin/${{ inputs.build-name }}.app build/bin/${{ inputs.build-name }}.app.zip
     - name: Build Installer (signed)
       if: runner.os == 'macOS' && inputs.sign != 'false' && inputs.sign-macos-installer-id != '' && startsWith(github.ref, 'refs/tags/')
       shell: bash
