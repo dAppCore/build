@@ -68,6 +68,16 @@ runs:
         else
           echo "[DEBUG_LOG] (orchestrator) AUTO_STACK disabled; defaulting to wails2"
         fi
+        # A stack nobody routes builds nothing and reports success, which is
+        # worse than failing. Every value that reaches here must have a wrapper
+        # below; this catches the gap at the point it is introduced.
+        case "$sel_stack" in
+          wails2|wails3|cpp|core) ;;
+          *)
+            echo "::error::no wrapper for stack '$sel_stack' — nothing would be built"
+            exit 1
+            ;;
+        esac
         echo "SELECTED_STACK=$sel_stack" >> "$GITHUB_OUTPUT"
 
     - name: Call Wails v2 wrapper
@@ -93,6 +103,27 @@ runs:
         package: ${{ inputs.package }}
         build-name: ${{ inputs.build-name }}
         app-working-directory: ${{ inputs.app-working-directory }}
+
+    # cpp takes no build-platform for the same reason v3 does not: the
+    # conanfile's profile and layout decide the target, and the runner decides
+    # which one it can produce.
+    - name: Call C++ wrapper
+      if: steps.sel.outputs.SELECTED_STACK == 'cpp'
+      uses: dAppCore/build/actions/build/cpp@v4
+      with:
+        build: ${{ inputs.build }}
+        sign: ${{ inputs.sign }}
+        package: ${{ inputs.package }}
+        build-name: ${{ inputs.build-name }}
+        app-working-directory: ${{ inputs.app-working-directory }}
+
+    # core is a library pipeline, not a builder — vet, test, lint, vulncheck.
+    # It produces no artifact, so `build-name` and `package` do not reach it and
+    # a `core` build uploads nothing. That is the stack behaving correctly, not
+    # a packaging failure.
+    - name: Call Core Go wrapper
+      if: steps.sel.outputs.SELECTED_STACK == 'core'
+      uses: dAppCore/build/actions/build/core@v4
 outputs:
   SELECTED_STACK:
     description: "Stack selected by the orchestrator"

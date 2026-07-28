@@ -1,0 +1,96 @@
+name: "C++ (full pipeline)"
+description: >
+  Discovery, Conan, CMake build, tests and packaging for a C/C++ project.
+
+  The unit of description here is the conanfile, in the same way the Taskfile
+  is for Wails v3: it names the dependencies, generates the toolchain, and owns
+  the build. This pipeline runs it rather than reconstructing a cmake command,
+  so a project builds the same way in CI as on a desk.
+
+inputs:
+  build:
+    description: "Whether to run the build"
+    required: false
+    default: "true"
+  sign:
+    description: "Sign the build (macOS/Windows)"
+    required: false
+    default: "false"
+  package:
+    description: "Upload artifacts and release on tag"
+    required: false
+    default: "true"
+  build-name:
+    description: "The name of the binary"
+    required: true
+  build-type:
+    description: "CMake build type"
+    required: false
+    default: "Release"
+  conan-version:
+    description: "Conan version to install"
+    required: false
+    default: "latest"
+  conan-profile:
+    description: "Conan profile; empty means auto-detect"
+    required: false
+    default: ""
+  test:
+    description: "Run ctest after the build"
+    required: false
+    default: "true"
+  app-working-directory:
+    description: "Root of the project being built"
+    required: false
+    default: "."
+
+outputs:
+  SELECTED_STACK:
+    description: "Always cpp; lets the orchestrator report what it chose"
+    value: "cpp"
+  BINARY_PATH:
+    description: "Path to the built executable, relative to the working directory"
+    value: ${{ steps.build.outputs.BINARY_PATH }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Discovery
+      id: discovery
+      uses: dAppCore/build/actions/discovery@v4
+      with:
+        working-directory: ${{ inputs.app-working-directory }}
+
+    - name: Setup Conan
+      uses: dAppCore/build/actions/setup/conan@v4
+      with:
+        version: ${{ inputs.conan-version }}
+
+    - name: Build
+      id: build
+      uses: dAppCore/build/actions/build/cpp/build@v4
+      with:
+        build: ${{ inputs.build }}
+        app-working-directory: ${{ inputs.app-working-directory }}
+        build-name: ${{ inputs.build-name }}
+        build-type: ${{ inputs.build-type }}
+        conan-profile: ${{ inputs.conan-profile }}
+        test: ${{ inputs.test }}
+
+    - name: Sign artifacts (OS-conditional)
+      uses: dAppCore/build/actions/sign@v4
+      with:
+        sign: ${{ inputs.sign }}
+        app-working-directory: ${{ inputs.app-working-directory }}
+        build-name: ${{ inputs.build-name }}
+
+    - name: Package & release
+      uses: dAppCore/build/actions/package@v4
+      with:
+        package: ${{ inputs.package }}
+        build-name: ${{ inputs.build-name }}
+        os: ${{ steps.discovery.outputs.OS }}
+        arch: ${{ steps.discovery.outputs.ARCH }}
+        tag: ${{ steps.discovery.outputs.TAG }}
+        is-tag: ${{ steps.discovery.outputs.IS_TAG }}
+        short-sha: ${{ steps.discovery.outputs.SHORT_SHA }}

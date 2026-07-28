@@ -1,25 +1,57 @@
-name: "Setup Conan (placeholder)"
-description: "Installs Conan package manager for C/C++ projects (future use)"
+name: "Setup Conan"
+description: >
+  Installs the Conan package manager with uv and puts it on PATH.
+
+  It used to `pip install --user` and then print "Add ~/.local/bin to PATH if
+  needed" — fine while nothing called conan, useless the moment something did.
+  The obvious repair was to ask Python where its user scripts directory is,
+  because that answer differs per platform and per version.
+
+  uv removes the question instead of answering it: `uv tool install` puts the
+  shim in ~/.local/bin on every platform, isolates the tool in its own
+  environment so it cannot collide with a runner's system Python, resolves in a
+  fraction of the time pip takes, and — via setup-uv — caches between runs.
+
 inputs:
   version:
+    description: "Conan version, or `latest`"
     required: false
     default: "latest"
+
+outputs:
+  CONAN_VERSION:
+    description: "The Conan version that ended up on PATH"
+    value: ${{ steps.install.outputs.CONAN_VERSION }}
+
 runs:
   using: "composite"
   steps:
-    - name: Install Python (for pip)
-      if: runner.os == 'Windows'
-      uses: actions/setup-python@v5
+    - name: Install uv
+      uses: astral-sh/setup-uv@v9
       with:
-        python-version: '3.x'
-    - name: Install Conan via pip
+        enable-cache: true
+        cache-suffix: conan-${{ inputs.version }}
+
+    - name: Install Conan
+      id: install
       shell: bash
+      env:
+        REQUESTED: ${{ inputs.version }}
       run: |
         set -euo pipefail
-        if command -v pip3 >/dev/null 2>&1; then PIP=pip3; elif command -v pip >/dev/null 2>&1; then PIP=pip; else echo "pip not found" && exit 1; fi
-        if [ "${{ inputs.version }}" = "latest" ]; then
-          $PIP install --user conan
+
+        if [ "$REQUESTED" = "latest" ]; then
+          uv tool install --force conan
         else
-          $PIP install --user conan=="${{ inputs.version }}"
+          uv tool install --force "conan==$REQUESTED"
         fi
-        echo "Conan installed. Add ~/.local/bin to PATH if needed."
+
+        # uv puts tool shims in ~/.local/bin on Linux, macOS and Windows alike.
+        # setup-uv already adds it, so this is belt and braces for a direct
+        # caller of this sub-action rather than the whole pipeline.
+        echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+        export PATH="$HOME/.local/bin:$PATH"
+
+        VERSION="$(conan --version | awk '{print $3}')"
+        echo "[DEBUG_LOG] (conan) $VERSION via uv"
+        echo "CONAN_VERSION=$VERSION" >> "$GITHUB_OUTPUT"

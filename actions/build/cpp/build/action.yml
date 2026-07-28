@@ -1,0 +1,134 @@
+name: "Build C++ project (Conan + CMake)"
+description: >
+  Resolves dependencies with Conan, builds through CMake, and reports where the
+  binary landed.
+
+  The project's conanfile owns the build. `conan build` runs its build() method,
+  which configures and builds CMake with the generated toolchain — so CI takes
+  the same path a developer does locally, and a project that builds on a desk
+  is not built a second, different way here.
+
+inputs:
+  build:
+    description: "Whether to run the build"
+    required: false
+    default: "true"
+  app-working-directory:
+    description: "Root of the project — where conanfile.py lives"
+    required: false
+    default: "."
+  build-name:
+    description: "Binary name, used to locate the output"
+    required: true
+  build-type:
+    description: "CMake build type"
+    required: false
+    default: "Release"
+  conan-profile:
+    description: >
+      Conan profile to build with. Empty means the auto-detected default, which
+      is what a fresh runner has.
+    required: false
+    default: ""
+  test:
+    description: "Run ctest after the build"
+    required: false
+    default: "true"
+
+outputs:
+  BINARY_PATH:
+    description: "Path to the built executable, relative to the working directory"
+    value: ${{ steps.locate.outputs.BINARY_PATH }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Detect a Conan profile
+      if: inputs.build == 'true'
+      shell: bash
+      working-directory: ${{ inputs.app-working-directory }}
+      run: |
+        set -euo pipefail
+        # A fresh runner has no profile at all, and Conan errors rather than
+        # guessing. --exist-ok makes this safe to run when one is already there.
+        conan profile detect --exist-ok
+        echo "[DEBUG_LOG] (cpp) conan $(conan --version | awk '{print $3}')"
+
+    - name: Resolve dependencies
+      if: inputs.build == 'true'
+      shell: bash
+      working-directory: ${{ inputs.app-working-directory }}
+      env:
+        BUILD_TYPE: ${{ inputs.build-type }}
+        PROFILE: ${{ inputs.conan-profile }}
+      run: |
+        set -euo pipefail
+        args=(install . --build=missing -s "build_type=$BUILD_TYPE")
+        if [ -n "$PROFILE" ]; then args+=(-pr "$PROFILE"); fi
+        echo "[DEBUG_LOG] (cpp) conan ${args[*]}"
+        conan "${args[@]}"
+
+    - name: Build
+      if: inputs.build == 'true'
+      shell: bash
+      working-directory: ${{ inputs.app-working-directory }}
+      env:
+        BUILD_TYPE: ${{ inputs.build-type }}
+        PROFILE: ${{ inputs.conan-profile }}
+      run: |
+        set -euo pipefail
+        args=(build . -s "build_type=$BUILD_TYPE")
+        if [ -n "$PROFILE" ]; then args+=(-pr "$PROFILE"); fi
+        conan "${args[@]}"
+
+    - name: Locate the binary
+      id: locate
+      if: inputs.build == 'true'
+      shell: bash
+      working-directory: ${{ inputs.app-working-directory }}
+      env:
+        NAME: ${{ inputs.build-name }}
+      run: |
+        set -euo pipefail
+        # Where the binary lands is decided by the generator, not by us. Visual
+        # Studio is multi-config and writes build/release/Release/name.exe;
+        # Makefiles and Ninja are single-config and write build/release/name.
+        # Searching beats predicting, because the conanfile's layout() is free
+        # to put the build folder wherever it likes.
+        exe="$NAME"
+        if [ "${RUNNER_OS}" = "Windows" ]; then exe="$NAME.exe"; fi
+
+        found="$(find build -type f -name "$exe" 2>/dev/null | head -1 || true)"
+        if [ -z "$found" ]; then
+          echo "::error::built no file named '$exe' under build/"
+          find build -maxdepth 3 -type f 2>/dev/null | head -40 || true
+          exit 1
+        fi
+        echo "[DEBUG_LOG] (cpp) binary=$found"
+        echo "BINARY_PATH=$found" >> "$GITHUB_OUTPUT"
+
+    - name: Normalise the executable bit
+      if: inputs.build == 'true' && runner.os != 'Windows'
+      shell: bash
+      working-directory: ${{ inputs.app-working-directory }}
+      run: chmod +x "${{ steps.locate.outputs.BINARY_PATH }}"
+
+    - name: Test
+      if: inputs.build == 'true' && inputs.test == 'true'
+      shell: bash
+      working-directory: ${{ inputs.app-working-directory }}
+      env:
+        BUILD_TYPE: ${{ inputs.build-type }}
+      run: |
+        set -euo pipefail
+        # ctest lives beside the CMake cache, which is the binary's directory
+        # on single-config generators and its parent on multi-config ones.
+        dir="$(dirname "${{ steps.locate.outputs.BINARY_PATH }}")"
+        if [ ! -f "$dir/CTestTestfile.cmake" ] && [ -f "$(dirname "$dir")/CTestTestfile.cmake" ]; then
+          dir="$(dirname "$dir")"
+        fi
+        if [ ! -f "$dir/CTestTestfile.cmake" ]; then
+          echo "[DEBUG_LOG] (cpp) no CTest configuration — skipping tests"
+          exit 0
+        fi
+        cd "$dir" && ctest --output-on-failure -C "$BUILD_TYPE"
