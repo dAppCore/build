@@ -146,7 +146,10 @@ runs:
         overwrite: 'true'
         name: ${{ steps.meta.outputs.ARTIFACT_NAME }}
         path: |
-          */bin/
+          # ** rather than *: an app one directory down (app-working-directory)
+          # puts its bin/ two levels deep, and a single-level glob missed it —
+          # so the artifact uploaded empty. Reported by Arthur in #49.
+          **/bin/
           *\bin\*
           artifact_meta.json
     - name: Release
@@ -155,5 +158,5 @@ runs:
       with:
         name: ${{ steps.meta.outputs.ARTIFACT_NAME }}
         files: |
-          */bin/*
+          **/bin/*
           artifact_meta.json

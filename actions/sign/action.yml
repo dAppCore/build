@@ -92,13 +92,13 @@ runs:
       shell: bash
       working-directory: ${{ inputs.app-working-directory }}
       run: |
-        productbuild --sign '${{ inputs.sign-macos-installer-id }}' --component ${{ inputs.app-working-directory }}/build/bin/${{ inputs.build-name }}.app /Applications ${{ inputs.app-working-directory }}/build/bin/${{ inputs.build-name }}.pkg
+        productbuild --sign '${{ inputs.sign-macos-installer-id }}' --component build/bin/${{ inputs.build-name }}.app /Applications build/bin/${{ inputs.build-name }}.pkg
     - name: Build Installer (unsigned)
       if: runner.os == 'macOS' && inputs.sign-macos-installer-id == '' && startsWith(github.ref, 'refs/tags/')
       shell: bash
       working-directory: ${{ inputs.app-working-directory }}
       run: |
-        productbuild --component ${{ inputs.app-working-directory }}/build/bin/${{ inputs.build-name }}.app /Applications ${{ inputs.app-working-directory }}/build/bin/${{ inputs.build-name }}.pkg
+        productbuild --component build/bin/${{ inputs.build-name }}.app /Applications build/bin/${{ inputs.build-name }}.pkg
     - name: Notarize Installer and zip with gon
       if: runner.os == 'macOS' && inputs.sign != 'false' && startsWith(github.ref, 'refs/tags/')
       shell: bash
@@ -106,7 +106,7 @@ runs:
       env:
         APPLE_PASSWORD: ${{ inputs.sign-macos-apple-password }}
       run: |
-        gon -log-level=info ${{ inputs.app-working-directory }}/build/darwin/gon-notarize.json
+        gon -log-level=info build/darwin/gon-notarize.json
 
     # Windows signing flow
     - name: Sign Windows binaries
