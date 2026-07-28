@@ -23,6 +23,10 @@ inputs:
     description: "Platform to build for (e.g., linux/amd64, windows/amd64, darwin/universal)"
     required: false
     default: "darwin/universal"
+  go-directory:
+    description: "Where the Go module lives, relative to the working directory"
+    required: false
+    default: ""
   app-working-directory:
     description: "Root of the app being built"
     required: false
@@ -59,6 +63,7 @@ runs:
         build-name: ${{ inputs.build-name }}
         build-platform: ${{ inputs.build-platform }}
         app-working-directory: ${{ inputs.app-working-directory }}
+        go-directory: ${{ inputs.go-directory }}
         AUTO_STACK: ${{ inputs.AUTO_STACK }}
         AUTO_SETUP: ${{ inputs.AUTO_SETUP }}
         STACK: ${{ inputs.STACK }}

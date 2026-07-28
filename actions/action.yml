@@ -24,6 +24,10 @@ inputs:
     required: false
     default: "."
     description: "Root of the app being built"
+  go-directory:
+    required: false
+    default: ""
+    description: "Where the Go module lives, relative to the working directory"
   # Orchestrator controls
   AUTO_STACK:
     required: false
@@ -163,6 +167,9 @@ runs:
     - name: Call Core Go wrapper
       if: steps.sel.outputs.SELECTED_STACK == 'core'
       uses: dAppCore/build/actions/build/core@v4
+      with:
+        app-working-directory: ${{ inputs.app-working-directory }}
+        go-directory: ${{ inputs.go-directory }}
 outputs:
   SELECTED_STACK:
     description: "Stack selected by the orchestrator"
