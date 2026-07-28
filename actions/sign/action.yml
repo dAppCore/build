@@ -42,6 +42,37 @@ inputs:
     required: false
     default: ''
   # Windows
+  notarize:
+    description: >
+      Notarise with xcrun notarytool instead of gon. gon has been unmaintained
+      since 2022 and notarytool is Apple's supported path; this will become the
+      default once callers have moved. Needs the Apple ID, team ID and an
+      app-specific password.
+    required: false
+    default: "false"
+  sign-macos-app-email:
+    description: "Apple ID email, for notarytool"
+    required: false
+    default: ""
+  sign-macos-app-team-id:
+    description: "Apple Developer team ID, for notarytool"
+    required: false
+    default: ""
+  dmg:
+    description: "Build a .dmg with create-dmg, and notarise that rather than the .pkg"
+    required: false
+    default: "false"
+  dmg-background:
+    description: "Background image for the DMG window, relative to the working directory"
+    required: false
+    default: "build/darwin/installer_background.png"
+  sign-sparkle:
+    description: >
+      Codesign a bundled Sparkle framework. Sparkle ships XPC services and
+      helper apps that must each be signed separately, and a bundle where they
+      are not is rejected at notarisation rather than at signing.
+    required: false
+    default: "false"
   sign-windows-cert:
     description: "Base64-encoded .pfx signing certificate; empty skips Windows signing"
     required: false
@@ -100,13 +131,88 @@ runs:
       run: |
         productbuild --component build/bin/${{ inputs.build-name }}.app /Applications build/bin/${{ inputs.build-name }}.pkg
     - name: Notarize Installer and zip with gon
-      if: runner.os == 'macOS' && inputs.sign != 'false' && startsWith(github.ref, 'refs/tags/')
+      if: runner.os == 'macOS' && inputs.sign != 'false' && inputs.notarize != 'true' && startsWith(github.ref, 'refs/tags/')
       shell: bash
       working-directory: ${{ inputs.app-working-directory }}
       env:
         APPLE_PASSWORD: ${{ inputs.sign-macos-apple-password }}
       run: |
         gon -log-level=info build/darwin/gon-notarize.json
+
+    # Sparkle ships XPC services and helper apps inside its framework, and each
+    # has to be signed on its own — the outer signature does not cover them.
+    # A bundle missing these passes codesign and fails notarisation, which is
+    # a slow way to find out. Contributed by Andrew Krueger in #42.
+    - name: Sign the Sparkle framework
+      if: runner.os == 'macOS' && inputs.sign != 'false' && inputs.sign-sparkle == 'true' && startsWith(github.ref, 'refs/tags/')
+      shell: bash
+      working-directory: ${{ inputs.app-working-directory }}
+      env:
+        IDENTITY: ${{ inputs.sign-macos-app-id }}
+        NAME: ${{ inputs.build-name }}
+      run: |
+        set -euo pipefail
+        FRAMEWORK="bin/$NAME.app/Contents/Frameworks/Sparkle.framework"
+        if [ ! -d "$FRAMEWORK" ]; then
+          echo "::error::sign-sparkle is on but $FRAMEWORK does not exist"
+          exit 1
+        fi
+        V="$FRAMEWORK/Versions/B"
+        codesign -f -s "$IDENTITY" -o runtime "$V/XPCServices/Installer.xpc"
+        codesign -f -s "$IDENTITY" -o runtime --preserve-metadata=entitlements "$V/XPCServices/Downloader.xpc"
+        codesign -f -s "$IDENTITY" -o runtime "$V/Autoupdate"
+        codesign -f -s "$IDENTITY" -o runtime "$V/Updater.app"
+        codesign -f -s "$IDENTITY" -o runtime "$FRAMEWORK"
+        codesign -f -s "$IDENTITY" --timestamp --entitlements build/darwin/entitlements.plist -o runtime "bin/$NAME.app"
+
+    - name: Build a DMG
+      if: runner.os == 'macOS' && inputs.dmg == 'true' && startsWith(github.ref, 'refs/tags/')
+      shell: bash
+      working-directory: ${{ inputs.app-working-directory }}
+      env:
+        NAME: ${{ inputs.build-name }}
+        BACKGROUND: ${{ inputs.dmg-background }}
+      run: |
+        set -euo pipefail
+        command -v create-dmg >/dev/null 2>&1 || brew install create-dmg
+
+        # The loose binary sits beside the .app and would otherwise be dragged
+        # into the DMG next to it, which looks like a mistake to a user.
+        rm -f "bin/$NAME"
+
+        args=(--volname "$NAME" --window-pos 200 120 --window-size 800 400
+              --icon-size 100 --icon "$NAME.app" 200 190
+              --hide-extension "$NAME.app" --app-drop-link 600 185)
+        if [ -f "$BACKGROUND" ]; then args+=(--background "$BACKGROUND"); fi
+
+        create-dmg "${args[@]}" "$NAME.dmg" "bin/"
+        mv "$NAME.dmg" bin/
+
+    - name: Notarise and staple with notarytool
+      if: runner.os == 'macOS' && inputs.sign != 'false' && inputs.notarize == 'true' && startsWith(github.ref, 'refs/tags/')
+      shell: bash
+      working-directory: ${{ inputs.app-working-directory }}
+      env:
+        APPLE_ID: ${{ inputs.sign-macos-app-email }}
+        TEAM_ID: ${{ inputs.sign-macos-app-team-id }}
+        APPLE_PASSWORD: ${{ inputs.sign-macos-apple-password }}
+        NAME: ${{ inputs.build-name }}
+        DMG: ${{ inputs.dmg }}
+      run: |
+        set -euo pipefail
+        for v in APPLE_ID TEAM_ID APPLE_PASSWORD; do
+          if [ -z "${!v}" ]; then echo "::error::notarize is on but $v is empty"; exit 1; fi
+        done
+
+        if [ "$DMG" = "true" ]; then TARGET="bin/$NAME.dmg"; else TARGET="bin/$NAME.pkg"; fi
+        test -f "$TARGET"
+
+        xcrun notarytool submit "$TARGET" \
+          --apple-id "$APPLE_ID" --team-id "$TEAM_ID" --password "$APPLE_PASSWORD" \
+          --wait --timeout 30m
+        # Stapling attaches the ticket so the app validates without a network
+        # round trip on first launch.
+        xcrun stapler staple "$TARGET"
 
     # Windows signing flow
     - name: Sign Windows binaries

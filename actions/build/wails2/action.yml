@@ -120,6 +120,26 @@ inputs:
     required: false
     default: ''
     description: "Password for the installer certificate"
+  notarize:
+    description: "Notarise with xcrun notarytool rather than gon"
+    required: false
+    default: "false"
+  sign-macos-app-email:
+    description: "Apple ID email, for notarytool"
+    required: false
+    default: ""
+  sign-macos-app-team-id:
+    description: "Apple Developer team ID, for notarytool"
+    required: false
+    default: ""
+  dmg:
+    description: "Build a .dmg and notarise that rather than the .pkg"
+    required: false
+    default: "false"
+  sign-sparkle:
+    description: "Codesign a bundled Sparkle framework"
+    required: false
+    default: "false"
   sign-windows-cert:
     required: false
     default: ''
