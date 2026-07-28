@@ -3,6 +3,16 @@ name: Build Action self-tests
 permissions:
   contents: read
 
+concurrency:
+  # One run per branch. A push supersedes the one before it, and the older run
+  # is answering a question about code nobody has any more — so it is cancelled
+  # rather than left to finish and report on a tree that no longer exists.
+  #
+  # Tags are exempt. A release build is not superseded by anything, and half a
+  # release is worse than a slow one.
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
 on:
   push:
     branches: [ "main", "*-*" ]
