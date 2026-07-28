@@ -189,27 +189,48 @@ runs:
         esac
         arch="${IN_ARCH:-amd64}"
 
-        mkdir -p .release-assets
+        # One zip per platform, named <prefix>-<os>-<arch>.zip, holding the
+        # binary under its own name. A download stays predictable and an
+        # extraction gives you `core` — not `core-linux-amd64`, which is a name
+        # nobody wants to type or put on PATH.
+        rm -rf .release-assets .release-staging
+        mkdir -p .release-assets .release-staging
+
         staged=0
         while IFS= read -r f; do
           [ -f "$f" ] || continue
           case "$f" in *.json) continue ;; esac
-          # Basename first: the path is ./bin/core, and testing the whole
-          # path for a dot matched the "./" and produced an extension of
-          # "/bin/core". Windows passed by luck, its .exe being the last dot
-          # either way.
-          base="${f##*/}"
-          ext=""
-          case "$base" in *.*) ext=".${base##*.}" ;; esac
-          cp "$f" ".release-assets/${prefix}-${os}-${arch}${ext}"
+          cp "$f" ".release-staging/${f##*/}"
           staged=$((staged+1))
-        done < <(find . -path '*/bin/*' -type f -not -path './.release-assets/*' 2>/dev/null)
+        done < <(find . -path '*/bin/*' -type f \
+                   -not -path './.release-assets/*' -not -path './.release-staging/*' 2>/dev/null)
 
         if [ "$staged" -eq 0 ]; then
           echo "::warning::no files under */bin/ to release"
+          echo "ASSET=" >> "$GITHUB_OUTPUT"
+          exit 0
         fi
-        echo "[DEBUG_LOG] staged $staged asset(s) as ${prefix}-${os}-${arch}*"
-        ls -la .release-assets || true
+
+        asset="${prefix}-${os}-${arch}.zip"
+        out="$PWD/.release-assets/$asset"
+
+        # zip on Linux and macOS keeps the executable bit, which matters: an
+        # archive that unpacks to a non-executable file fails at the first
+        # thing anyone does with it. Windows runners ship 7z rather than zip,
+        # and the bit is meaningless there anyway.
+        if command -v zip >/dev/null 2>&1; then
+          ( cd .release-staging && zip -q -X "$out" ./* )
+        elif command -v 7z >/dev/null 2>&1; then
+          ( cd .release-staging && 7z a -tzip -bso0 -bsp0 "$out" ./* )
+        else
+          echo "::error::neither zip nor 7z is available to package the release"
+          exit 1
+        fi
+
+        rm -rf .release-staging
+        echo "[DEBUG_LOG] $staged file(s) into $asset"
+        echo "ASSET=$asset" >> "$GITHUB_OUTPUT"
+        ls -la .release-assets
 
     - name: Release
       uses: softprops/action-gh-release@v1
