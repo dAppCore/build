@@ -312,6 +312,14 @@ runs:
         sign-macos-installer-cert-password: ${{ steps.wcfg.outputs.SIGN_MACOS_INSTALLER_CERT_PASSWORD }}
         sign-windows-cert: ${{ steps.wcfg.outputs.SIGN_WINDOWS_CERT }}
         sign-windows-cert-password: ${{ steps.wcfg.outputs.SIGN_WINDOWS_CERT_PASSWORD }}
+        # Declared on this wrapper and consumed by sign, but never joined up —
+        # so notarisation, the .dmg and the Sparkle signature were options a
+        # caller could set and watch do nothing.
+        notarize: ${{ inputs.notarize }}
+        sign-macos-app-email: ${{ inputs.sign-macos-app-email }}
+        sign-macos-app-team-id: ${{ inputs.sign-macos-app-team-id }}
+        dmg: ${{ inputs.dmg }}
+        sign-sparkle: ${{ inputs.sign-sparkle }}
 
     - name: Package & release
       uses: dAppCore/build/actions/package@v4

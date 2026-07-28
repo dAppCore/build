@@ -154,6 +154,7 @@ runs:
         package: ${{ inputs.package }}
         build-name: ${{ inputs.build-name }}
         build-platform: ${{ inputs.build-platform }}
+        build-tags: ${{ inputs.build-tags }}
         app-working-directory: ${{ inputs.app-working-directory }}
         release-asset-prefix: ${{ inputs.release-asset-prefix }}
 
@@ -208,6 +209,12 @@ runs:
       with:
         build: ${{ inputs.build }}
         sign: ${{ inputs.sign }}
+        # Same name, different question: `test` here is the tri-state Go policy,
+        # while the C++ wrapper's is a plain gate on ctest. Forwarding `auto`
+        # verbatim would read as not-'true' and turn ctest off for every C++
+        # build, so the tri-state is mapped instead — and `auto` lands on the
+        # build step, which already skips when there is no CTest configuration.
+        test: ${{ inputs.test != 'false' }}
         package: ${{ inputs.package }}
         build-name: ${{ inputs.build-name }}
         app-working-directory: ${{ inputs.app-working-directory }}
