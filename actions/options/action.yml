@@ -23,6 +23,14 @@ inputs:
     description: "Build tags to pass to Go compiler. Space and/or comma separated."
     required: false
     default: "false"
+  upx:
+    description: "Compress the binary with upx, the Ultimate Packer for eXecutables"
+    required: false
+    default: "false"
+  upx-flags:
+    description: "Flags passed to upx"
+    required: false
+    default: ""
   nsis:
     description: "Include -nsis flag"
     required: false
@@ -49,6 +57,7 @@ runs:
         DISTRO: ${{ inputs.distro }}
         DISABLE_WEBKIT: ${{ inputs.disable-webkit-auto-tag }}
         LDFLAGS: ${{ inputs.build-ldflags }}
+        UPX_FLAGS: ${{ inputs.upx-flags }}
       run: |
         set -euo pipefail
         build_options=""
@@ -97,5 +106,12 @@ runs:
         # NSIS
         if ${{ inputs.nsis == 'true' }}; then
           build_options+=" -nsis"
+        fi
+        # upx compression (Nicola, #48)
+        if ${{ inputs.upx == 'true' }}; then
+          build_options+=" -upx"
+          if [[ -n "${UPX_FLAGS}" ]]; then
+            build_options+=" -upxflags='${UPX_FLAGS}'"
+          fi
         fi
         echo "BUILD_OPTIONS=$build_options" >> "$GITHUB_OUTPUT"

@@ -119,6 +119,10 @@ jobs:
           - { distro: '22.04', obf: 'false', nsis: 'false', tags: 'false', expect_webkit: 'false', debug: 'true', expect_flag: '-debug' }
           - { distro: '22.04', obf: 'false', nsis: 'false', tags: 'false', expect_webkit: 'false', windowsconsole: 'true', expect_flag: '-windowsconsole' }
           - { distro: '22.04', obf: 'false', nsis: 'false', tags: 'false', expect_webkit: 'false', ldflags: '-X=main.Version=1.2.3 -s', expect_flag: "-ldflags='-X=main.Version=1.2.3 -s'" }
+          # upx, from #48 — the flags travel as one quoted argument for the
+          # same reason ldflags does.
+          - { distro: '22.04', obf: 'false', nsis: 'false', tags: 'false', expect_webkit: 'false', upx: 'true', expect_flag: '-upx' }
+          - { distro: '22.04', obf: 'false', nsis: 'false', tags: 'false', expect_webkit: 'false', upx: 'true', upx_flags: '--best --lzma', expect_flag: "-upxflags='--best --lzma'" }
     steps:
       - uses: actions/checkout@v4
       - id: opts
@@ -132,6 +136,8 @@ jobs:
           build-debug: ${{ matrix.debug || 'false' }}
           build-windowsconsole: ${{ matrix.windowsconsole || 'false' }}
           build-ldflags: ${{ matrix.ldflags || 'false' }}
+          upx: ${{ matrix.upx || 'false' }}
+          upx-flags: ${{ matrix.upx_flags || '' }}
       - name: Assert BUILD_OPTIONS
         shell: bash
         run: |

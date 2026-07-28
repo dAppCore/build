@@ -32,6 +32,18 @@ inputs:
     description: "Build tags to pass to Go compiler. Must be quoted. Space or comma (but not both) separated"
     required: false
     default: "false"
+  upx:
+    description: "Compress the binary with upx"
+    required: false
+    default: "false"
+  upx-flags:
+    description: "Flags passed to upx"
+    required: false
+    default: ""
+  build-dependency-path:
+    description: "Path to the file the Go cache keys on"
+    required: false
+    default: "go.sum"
   build-debug:
     description: "Retain debug info and show the debug console"
     required: false
@@ -207,11 +219,15 @@ runs:
         build-debug: ${{ inputs.build-debug }}
         build-ldflags: ${{ inputs.build-ldflags }}
         build-windowsconsole: ${{ inputs.build-windowsconsole }}
+        upx: ${{ inputs.upx }}
+        upx-flags: ${{ inputs.upx-flags }}
         distro: ${{ steps.discovery.outputs.DISTRO }}
 
     - name: Setup toolchains (Go/Node/Deno/Wails)
       uses: dAppCore/build/actions/setup@v4
       with:
+        build-dependency-path: ${{ inputs.build-dependency-path }}
+        upx: ${{ inputs.upx }}
         go-version: ${{ steps.wcfg.outputs.GO_VER }}
         build-cache: ${{ inputs.build-cache }}
         build-obfuscate: ${{ steps.wcfg.outputs.OBFUSCATE }}

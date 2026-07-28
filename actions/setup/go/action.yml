@@ -5,6 +5,12 @@ inputs:
     description: "Go version to install"
     required: false
     default: "1.23"
+  build-dependency-path:
+    description: >
+      Path to the file the Go cache keys on. A module in a subdirectory keeps
+      its go.sum there, and a hardcoded root path meant the cache never hit.
+    required: false
+    default: "go.sum"
   build-cache:
     description: "Enable the Go build cache"
     required: false
@@ -39,7 +45,7 @@ runs:
       with:
         check-latest: true
         cache: ${{ inputs.build-cache }}
-        cache-dependency-path: 'go.sum'
+        cache-dependency-path: ${{ inputs.build-dependency-path }}
         go-version: ${{ inputs.go-version }}
     - name: Install Garble
       if: inputs.build-obfuscate == 'true'
