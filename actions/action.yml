@@ -255,6 +255,9 @@ runs:
         release-asset-prefix: ${{ inputs.release-asset-prefix }}
         entry: ${{ inputs.entry }}
         permissions: ${{ inputs.permissions }}
+        deb: ${{ inputs.deb }}
+        deb-maintainer: ${{ inputs.deb-maintainer }}
+        deb-description: ${{ inputs.deb-description }}
 
     # core is a library pipeline, not a builder — vet, test, lint, vulncheck.
     # It produces no artifact, so `build-name` and `package` do not reach it and

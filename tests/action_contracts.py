@@ -69,6 +69,8 @@ def callee_path(uses: str) -> pathlib.Path | None:
 
 def main() -> int:
     problems: list[str] = []
+    # callee -> input -> {caller: forwards?}, for the asymmetry report below.
+    wiring: dict[str, dict[str, dict[str, bool]]] = {}
 
     for path in action_files():
         rel = path.relative_to(ROOT)
@@ -129,6 +131,8 @@ def main() -> int:
             forwarded = set((step.get("with") or {}).keys())
             target_rel = str(target.relative_to(ROOT))
             for name in (callee.get("inputs") or {}):
+                wiring.setdefault(target_rel, {}).setdefault(name, {})[str(rel)] = (
+                    name in forwarded)
                 if name in declared and name not in forwarded:
                     if (target_rel, name) in PASSTHROUGH_EXEMPT:
                         continue
@@ -137,12 +141,38 @@ def main() -> int:
                         f"{rel}: '{label}' does not forward {name} to {target_rel} — "
                         f"the callee will use its own default")
 
+    # Opt-in, and never a failure. The check above catches an input a caller
+    # declares and forgets to wire; it cannot catch one a caller never declared
+    # at all, because not declaring it is how a stack says it does not offer
+    # the option — and `deb` reached the Go stack and not the Deno one exactly
+    # that way. Most asymmetries are correct (wails3 does not take wails2's
+    # options), so printing them on every run would only teach people to skip
+    # the output. Reach for `--asymmetries` when wiring a new stack or hunting
+    # an option that appears to do nothing.
+    asymmetries: list[str] = []
+    for callee, inputs in sorted(wiring.items()):
+        for name, callers in sorted(inputs.items()):
+            missing = sorted(c for c, ok in callers.items() if not ok)
+            if missing and len(missing) != len(callers):
+                has = sorted(c for c, ok in callers.items() if ok)
+                asymmetries.append(
+                    f"  {callee} :: {name}\n"
+                    f"      wired by  {', '.join(has)}\n"
+                    f"      not by    {', '.join(missing)}")
+
     if problems:
         print("\n".join(f"  {p}" for p in problems))
         print(f"\n{len(problems)} problem(s)")
         return 1
 
     print(f"checked {len(list(action_files()))} action.yml files — all sound")
+    if "--asymmetries" in sys.argv:
+        print(f"\n{len(asymmetries)} input(s) wired by some callers of a callee "
+              f"and not others:\n")
+        print("\n".join(asymmetries))
+    elif asymmetries:
+        print(f"({len(asymmetries)} caller asymmetries — "
+              f"run with --asymmetries to list them)")
     return 0
 
 
