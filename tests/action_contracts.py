@@ -39,10 +39,32 @@ StrictLoader.add_constructor(
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
+# Passthroughs a caller deliberately does not make. Each one is a decision, so
+# each one is named here rather than the check being loosened for all of them.
+PASSTHROUGH_EXEMPT = {
+    # Danet has no build task; compiling is the build, and naming an unrelated
+    # `build` task in someone's deno.json would be mistaken for one.
+    ("actions/build/deno/framework/danet/action.yml", "build-task"),
+}
+
 
 def action_files():
     yield ROOT / "action.yml"
     yield from sorted((ROOT / "actions").rglob("action.yml"))
+
+
+def callee_path(uses: str) -> pathlib.Path | None:
+    """Resolve a `uses:` on a sibling action in this repository to its manifest.
+
+    Only same-repo references resolve; a third-party action is somebody else's
+    contract and is not ours to check.
+    """
+    ref = uses.split("@", 1)[0]
+    if not ref.startswith("dAppCore/build"):
+        return None
+    sub = ref[len("dAppCore/build"):].strip("/")
+    path = (ROOT / sub / "action.yml") if sub else (ROOT / "action.yml")
+    return path if path.is_file() else None
 
 
 def main() -> int:
@@ -83,9 +105,37 @@ def main() -> int:
                     f"{rel}:{i}: format() first argument is not quoted — the runner will reject this manifest")
 
         # Inputs need a description or the marketplace listing renders blanks.
-        for name, spec in (doc.get("inputs") or {}).items():
+        declared = (doc.get("inputs") or {})
+        for name, spec in declared.items():
             if not isinstance(spec, dict) or not spec.get("description"):
                 problems.append(f"{rel}: input {name} has no description")
+
+        # An input both sides declare and the caller forgets to forward leaves
+        # the callee on its own default, silently. The caller looks like it
+        # honours the option, the build ignores it, and nothing says so — which
+        # is how `entry` reached the deno stack and never reached the danet
+        # adapter, pinning every Danet build to run.ts.
+        for i, step in enumerate(steps):
+            uses = step.get("uses")
+            if not isinstance(uses, str):
+                continue
+            target = callee_path(uses)
+            if target is None:
+                continue
+            try:
+                callee = yaml.load(target.read_text(), Loader=StrictLoader) or {}
+            except yaml.YAMLError:
+                continue  # reported when that file is checked in its own right
+            forwarded = set((step.get("with") or {}).keys())
+            target_rel = str(target.relative_to(ROOT))
+            for name in (callee.get("inputs") or {}):
+                if name in declared and name not in forwarded:
+                    if (target_rel, name) in PASSTHROUGH_EXEMPT:
+                        continue
+                    label = step.get("name", f"step {i}")
+                    problems.append(
+                        f"{rel}: '{label}' does not forward {name} to {target_rel} — "
+                        f"the callee will use its own default")
 
     if problems:
         print("\n".join(f"  {p}" for p in problems))

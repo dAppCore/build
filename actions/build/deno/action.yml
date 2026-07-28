@@ -109,6 +109,10 @@ runs:
         build: ${{ inputs.build }}
         app-working-directory: ${{ inputs.app-working-directory }}
         build-name: ${{ inputs.build-name }}
+        # An empty value would override the adapter's default rather than fall
+        # back to it, so the danet convention is named here instead. A caller
+        # that names an entry gets it; one that does not still gets run.ts.
+        entry: ${{ inputs.entry || 'run.ts' }}
         permissions: ${{ inputs.permissions }}
         output-directory: ${{ inputs.output-directory }}
 
