@@ -214,18 +214,26 @@ runs:
         asset="${prefix}-${os}-${arch}.zip"
         out="$PWD/.release-assets/$asset"
 
-        # zip on Linux and macOS keeps the executable bit, which matters: an
-        # archive that unpacks to a non-executable file fails at the first
-        # thing anyone does with it. Windows runners ship 7z rather than zip,
-        # and the bit is meaningless there anyway.
+        # zip is the tool. It is on every Linux and macOS runner and it keeps
+        # the executable bit — an archive that unpacks to a non-executable file
+        # fails at the first thing anyone does with it.
+        #
+        # Where it is absent, which is Windows, PowerShell's Compress-Archive
+        # is the fallback: it ships with the OS and needs no install. 7z is
+        # deliberately not used — assuming it is present is exactly the kind of
+        # dependency a packaging step should not add.
         if command -v zip >/dev/null 2>&1; then
           ( cd .release-staging && zip -q -X "$out" ./* )
-        elif command -v 7z >/dev/null 2>&1; then
-          ( cd .release-staging && 7z a -tzip -bso0 -bsp0 "$out" ./* )
+        elif command -v pwsh >/dev/null 2>&1 || command -v powershell >/dev/null 2>&1; then
+          PS_BIN=pwsh
+          command -v pwsh >/dev/null 2>&1 || PS_BIN=powershell
+          "$PS_BIN" -NoProfile -Command "Compress-Archive -Path '.release-staging/*' -DestinationPath '$out' -Force"
         else
-          echo "::error::neither zip nor 7z is available to package the release"
+          echo "::error::no zip and no PowerShell available to package the release"
           exit 1
         fi
+
+        test -f "$out"
 
         rm -rf .release-staging
         echo "[DEBUG_LOG] $staged file(s) into $asset"
