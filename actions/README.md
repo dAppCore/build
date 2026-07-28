@@ -6,7 +6,7 @@ Sub-actions overview
 - discovery — Detect OS/ARCH, Ubuntu distro (on Linux), repo/ref metadata, and project markers. Suggests a primary stack.
 - options — Compute `BUILD_OPTIONS` string for Wails v2 builds (adds `-tags webkit2_41` on Ubuntu 24.04 when appropriate).
 - setup — Orchestrator for toolchains (Go → npm → optional Deno → optional Conan).
-  - setup/go — Installs Go, optional Garble (when obfuscating), Wails CLI, and `gon` on macOS.
+  - setup/go — Installs Go, optional Garble (when obfuscating), and the Wails CLI when asked for.
   - setup/npm — Installs Node.js and optionally runs `npm ci`/`npm install` in your app directory (auto-detects `frontend/`).
   - setup/deno — ENV-first Deno setup and command runner (`DENO_*` envs).
   - setup/conan — Installs Conan via pip (placeholder for future C++ builds).

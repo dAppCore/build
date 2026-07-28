@@ -6,7 +6,6 @@ Purpose
   - npm/Node (optional install in your app working directory)
   - Deno (optional; ENV-first configuration)
   - Wails CLI (unless `wails-dev-build` is true)
-  - Installs `gon` on macOS for later signing
   - Conan (placeholder for future C++ stack)
 
 Inputs
@@ -61,6 +60,5 @@ Usage
 ```
 
 Notes
-- On macOS, `gon` is installed for later signing steps. No-op on other OSes.
 - If you do not need Deno, leave envs and inputs empty — it will be skipped.
 - If `wails-dev-build` is `true`, ensure `wails` is already available on PATH.

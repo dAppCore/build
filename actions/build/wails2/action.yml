@@ -121,7 +121,7 @@ inputs:
     default: ''
     description: "Password for the installer certificate"
   notarize:
-    description: "Notarise with xcrun notarytool rather than gon"
+    description: "Notarise with xcrun notarytool"
     required: false
     default: "false"
   sign-macos-app-email:

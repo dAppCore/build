@@ -2,7 +2,7 @@
 
 Purpose
 - Unified signing step for macOS and Windows.
-- macOS: imports certificates, signs the `.app` with `gon`, zips the `.app`, builds a `.pkg` (signed or unsigned), and notarizes on tag builds.
+- macOS: imports certificates, signs the `.app` with `codesign`, zips the `.app`, builds a `.pkg` (signed or unsigned), and notarises with `xcrun notarytool` when `notarize` is on. All tag-gated.
 - Windows: signs the `.exe` and the NSIS installer using a provided PFX (base64) and password.
 
 When it runs
@@ -14,7 +14,7 @@ Inputs (union of previous per-OS signers)
 - `app-working-directory` (default `.`)
 - `build-name` (required)
 - macOS:
-  - `sign-macos-apple-password` — app-specific password for Apple ID (`gon` uses this)
+  - `sign-macos-apple-password` — app-specific password for the Apple ID (notarytool uses this)
   - `sign-macos-app-id` — Developer ID Application subject
   - `sign-macos-app-cert` — Base64-encoded `.p12`
   - `sign-macos-app-cert-password` — Password for the Application certificate
@@ -26,8 +26,6 @@ Inputs (union of previous per-OS signers)
   - `sign-windows-cert-password` — Password for the PFX
 
 Required project files (macOS)
-- `build/darwin/gon-sign.json` — config for signing the `.app`
-- `build/darwin/gon-notarize.json` — config for notarizing `.pkg` and `.app.zip`
 
 Usage
 ```yaml
@@ -51,6 +49,6 @@ Usage
 ```
 
 Notes
-- On macOS, `gon` must be installed (`actions/setup/go` installs it automatically on macOS).
+- On macOS, `codesign` and `xcrun notarytool` come with the Xcode command line tools, which GitHub's macOS runners have.
 - The `.app` zip is produced regardless of signing to ease distribution.
 - Installer `.pkg` is signed when `sign == 'true'` and an installer ID is provided; otherwise an unsigned pkg is built on tags.

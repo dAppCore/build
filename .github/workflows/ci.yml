@@ -140,18 +140,23 @@ jobs:
           upx-flags: ${{ matrix.upx_flags || '' }}
       - name: Assert BUILD_OPTIONS
         shell: bash
+        env:
+          # Through env, not interpolation: -upxflags='--best --lzma' contains
+          # quotes, and pasting that inside a shell assignment mangles it.
+          BUILD_OPTIONS: ${{ steps.opts.outputs.BUILD_OPTIONS }}
+          EXPECT_FLAG: ${{ matrix.expect_flag || '' }}
         run: |
           set -euo pipefail
-          BO='${{ steps.opts.outputs.BUILD_OPTIONS }}'
+          BO="$BUILD_OPTIONS"
           echo "BUILD_OPTIONS=$BO"
           if [ "${{ matrix.obf }}" = "true" ] && ! echo "$BO" | grep -q -- "-obfuscated"; then echo "missing -obfuscated"; exit 1; fi
           if [ "${{ matrix.nsis }}" = "true" ] && ! echo "$BO" | grep -q -- "-nsis"; then echo "missing -nsis"; exit 1; fi
           if [ "${{ matrix.expect_webkit }}" = "true" ] && ! echo "$BO" | grep -q -- "webkit2_41"; then echo "missing webkit2_41"; exit 1; fi
           if [ "${{ matrix.disable_webkit || 'false' }}" = "true" ] && echo "$BO" | grep -q -- "webkit2_41"; then echo "webkit2_41 should be disabled"; exit 1; fi
-          if [ -n "${{ matrix.expect_flag || '' }}" ]; then
+          if [ -n "$EXPECT_FLAG" ]; then
             case "$BO" in
-              *"${{ matrix.expect_flag }}"*) : ;;
-              *) echo "missing ${{ matrix.expect_flag }}"; exit 1 ;;
+              *"$EXPECT_FLAG"*) : ;;
+              *) echo "missing $EXPECT_FLAG"; exit 1 ;;
             esac
           fi
           if [ -n "${{ matrix.expect_dedupe || '' }}" ]; then
@@ -301,14 +306,21 @@ jobs:
         os: [macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - name: macOS gon presence
+      - name: macOS signing tool discovery
         if: runner.os == 'macOS'
         shell: bash
         run: |
-          if command -v gon >/dev/null 2>&1; then
-            echo "[DEBUG_LOG] gon present: $(gon --version)"
+          # Diagnostic, so it reports and stays green either way — a runner
+          # without these is a fact worth seeing before a release depends on it.
+          if command -v codesign >/dev/null 2>&1; then
+            echo "[DEBUG_LOG] codesign: $(codesign --version 2>&1 | head -1)"
           else
-            echo "[DEBUG_LOG] gon not found. It is installed during the Go setup step in real builds (macOS only)."
+            echo "[DEBUG_LOG] codesign not found"
+          fi
+          if xcrun notarytool --version >/dev/null 2>&1; then
+            echo "[DEBUG_LOG] notarytool: $(xcrun notarytool --version 2>&1 | head -1)"
+          else
+            echo "[DEBUG_LOG] notarytool not found — notarisation would fail on a tag"
           fi
       - name: Windows signtool discovery
         if: runner.os == 'Windows'

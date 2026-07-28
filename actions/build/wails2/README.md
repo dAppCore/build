@@ -51,7 +51,13 @@ jobs:
 
 macOS Code Signing (Wails v2)
 
-You need two `gon` configuration files to sign and notarize the `.app` before building the installer pkg.
+Signing and notarisation are handled by `codesign` and `xcrun notarytool`, both
+of which come with the Xcode command line tools. There are no configuration
+files to write: what used to live in `gon-sign.json` and `gon-notarize.json` is
+now inputs.
+
+`build/darwin/entitlements.plist` is still read if you have one — it is passed
+to `codesign --entitlements` when present, and skipped when not.
 
 Workflow snippet
 ```yaml
@@ -67,46 +73,13 @@ Workflow snippet
     sign-macos-installer-id: ${{ secrets.MACOS_INSTALLER_CERT_ID }}
     sign-macos-installer-cert: ${{ secrets.MACOS_INSTALLER_CERT }}
     sign-macos-installer-cert-password: ${{ secrets.MACOS_INSTALLER_CERT_PASSWORD }}
+    # Notarisation is opt-in: it needs an Apple ID and team ID a build
+    # otherwise does not.
+    notarize: true
+    sign-macos-app-email: ${{ secrets.APPLE_ID }}
+    sign-macos-app-team-id: ${{ secrets.APPLE_TEAM_ID }}
 ```
 
-`build/darwin/gon-sign.json`
-```json
-{
-  "source" : ["./build/bin/wailsApp.app"],
-  "bundle_id" : "com.wails.app",
-  "apple_id": {
-    "username": "username",
-    "password": "@env:APPLE_PASSWORD"
-  },
-  "sign" :{
-    "application_identity" : "Developer ID Application: XXXXXXXX (XXXXXX)",
-    "entitlements_file": "./build/darwin/entitlements.plist"
-  },
-  "dmg" :{
-    "output_path":  "./build/bin/wailsApp.dmg",
-    "volume_name":  "Lethean"
-  }
-}
-```
-
-`build/darwin/gon-notarize.json`
-```json
-{
-  "notarize": [{
-    "path": "./build/bin/wailsApp.pkg",
-    "bundle_id": "com.wails.app",
-    "staple": true
-  },{
-    "path": "./build/bin/wailsApp.app.zip",
-    "bundle_id": "com.wails.app",
-    "staple": false
-  }],
-  "apple_id": {
-    "username": "USER name",
-    "password": "@env:APPLE_PASSWORD"
-  }
-}
-```
 
 `build/darwin/entitlements.plist`
 ```xml

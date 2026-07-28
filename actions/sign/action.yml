@@ -44,10 +44,10 @@ inputs:
   # Windows
   notarize:
     description: >
-      Notarise with xcrun notarytool instead of gon. gon has been unmaintained
-      since 2022 and notarytool is Apple's supported path; this will become the
-      default once callers have moved. Needs the Apple ID, team ID and an
-      app-specific password.
+      Notarise with xcrun notarytool. Off by default because it needs an Apple
+      ID, a team ID and an app-specific password that a build otherwise does
+      not. gon used to do this and is gone: unmaintained since 2022, and
+      notarytool is Apple's supported path.
     required: false
     default: "false"
   sign-macos-app-email:
@@ -100,45 +100,76 @@ runs:
         p12-file-base64: ${{ inputs.sign-macos-installer-cert }}
         p12-password: ${{ inputs.sign-macos-installer-cert-password }}
         create-keychain: false
-    - name: Sign macOS .app with gon
+    - name: Sign the .app
       if: runner.os == 'macOS' && inputs.sign != 'false' && startsWith(github.ref, 'refs/tags/')
       shell: bash
       working-directory: ${{ inputs.app-working-directory }}
       env:
-        APPLE_PASSWORD: ${{ inputs.sign-macos-apple-password }}
+        IDENTITY: ${{ inputs.sign-macos-app-id }}
+        NAME: ${{ inputs.build-name }}
       run: |
-        echo "Signing Package"
-        gon -log-level=info ./build/darwin/gon-sign.json
+        set -euo pipefail
+        APP="build/bin/$NAME.app"
+        if [ ! -d "$APP" ]; then
+          echo "::notice::no $APP — this stack produces no bundle, nothing to sign"
+          exit 0
+        fi
+        if [ -z "$IDENTITY" ]; then
+          echo "::error::sign is on but sign-macos-app-id is empty"
+          exit 1
+        fi
+
+        # gon drove codesign from a JSON file and has been unmaintained since
+        # 2022. codesign is the thing it wrapped, so calling it directly loses
+        # nothing and removes a dependency. --deep is deliberately absent:
+        # Apple deprecated it, and nested code — Sparkle, for one — wants
+        # signing individually anyway.
+        ENTITLEMENTS="build/darwin/entitlements.plist"
+        args=(-f -s "$IDENTITY" --timestamp -o runtime)
+        if [ -f "$ENTITLEMENTS" ]; then args+=(--entitlements "$ENTITLEMENTS"); fi
+        codesign "${args[@]}" "$APP"
+        codesign --verify --strict --verbose=2 "$APP"
     - name: Build .app zip file
       if: runner.os == 'macOS'
       working-directory: ${{ inputs.app-working-directory }}
       shell: bash
+      env:
+        NAME: ${{ inputs.build-name }}
       run: |
+        set -euo pipefail
         # Paths are relative to working-directory, which is already
         # app-working-directory — prefixing again asked ditto for
         # <dir>/<dir>/build/bin. harrys522 spotted this in #46.
-        ditto -c -k --keepParent build/bin/${{ inputs.build-name }}.app build/bin/${{ inputs.build-name }}.app.zip
+        APP="build/bin/$NAME.app"
+        # This step had no gate beyond the OS, which was harmless while every
+        # stack was Wails. The Go, C++ and Deno stacks produce a binary and no
+        # bundle, so on macOS it asked ditto for something that never existed.
+        if [ ! -d "$APP" ]; then
+          echo "::notice::no $APP — this stack produces no bundle, nothing to zip"
+          exit 0
+        fi
+        ditto -c -k --keepParent "$APP" "build/bin/$NAME.app.zip"
     - name: Build Installer (signed)
       if: runner.os == 'macOS' && inputs.sign != 'false' && inputs.sign-macos-installer-id != '' && startsWith(github.ref, 'refs/tags/')
       shell: bash
       working-directory: ${{ inputs.app-working-directory }}
+      env:
+        NAME: ${{ inputs.build-name }}
+        INSTALLER_ID: ${{ inputs.sign-macos-installer-id }}
       run: |
-        productbuild --sign '${{ inputs.sign-macos-installer-id }}' --component build/bin/${{ inputs.build-name }}.app /Applications build/bin/${{ inputs.build-name }}.pkg
+        set -euo pipefail
+        test -d "build/bin/$NAME.app" || { echo "::notice::no bundle to package"; exit 0; }
+        productbuild --sign "$INSTALLER_ID" --component "build/bin/$NAME.app" /Applications "build/bin/$NAME.pkg"
     - name: Build Installer (unsigned)
       if: runner.os == 'macOS' && inputs.sign-macos-installer-id == '' && startsWith(github.ref, 'refs/tags/')
       shell: bash
       working-directory: ${{ inputs.app-working-directory }}
-      run: |
-        productbuild --component build/bin/${{ inputs.build-name }}.app /Applications build/bin/${{ inputs.build-name }}.pkg
-    - name: Notarize Installer and zip with gon
-      if: runner.os == 'macOS' && inputs.sign != 'false' && inputs.notarize != 'true' && startsWith(github.ref, 'refs/tags/')
-      shell: bash
-      working-directory: ${{ inputs.app-working-directory }}
       env:
-        APPLE_PASSWORD: ${{ inputs.sign-macos-apple-password }}
+        NAME: ${{ inputs.build-name }}
       run: |
-        gon -log-level=info build/darwin/gon-notarize.json
-
+        set -euo pipefail
+        test -d "build/bin/$NAME.app" || { echo "::notice::no bundle to package"; exit 0; }
+        productbuild --component "build/bin/$NAME.app" /Applications "build/bin/$NAME.pkg"
     # Sparkle ships XPC services and helper apps inside its framework, and each
     # has to be signed on its own — the outer signature does not cover them.
     # A bundle missing these passes codesign and fails notarisation, which is

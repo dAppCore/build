@@ -1,5 +1,5 @@
 name: "Setup Go (and Wails)"
-description: "Sets up Go (with optional cache), installs Garble when obfuscating, installs Wails CLI unless wails-dev-build is true; installs gon on macOS"
+description: "Sets up Go with an optional cache, Garble when obfuscating, and the Wails v2 CLI when asked for"
 inputs:
   go-version:
     description: "Go version to install"
@@ -57,7 +57,4 @@ runs:
       if: inputs.install-wails == 'true' && inputs.wails-dev-build == 'false'
       run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ inputs.wails-version }}
       shell: bash
-    - name: Install macOS deps (gon)
-      if: runner.os == 'macOS'
-      run: brew install mitchellh/gon/gon
       shell: bash
