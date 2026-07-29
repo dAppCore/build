@@ -86,7 +86,7 @@ jobs:
   build:
     runs-on: ${{ inputs.build-platform == 'windows/amd64' && 'windows-latest' || inputs.build-platform == 'linux/amd64' && 'ubuntu-latest' || 'macos-latest' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
       - name: Wails build action (wrapper)

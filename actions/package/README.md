@@ -4,8 +4,8 @@ Purpose
 - Uploads build artifacts from standard Wails output directories and publishes a GitHub Release on tag builds.
 
 What it does
-- Uses `actions/upload-artifact@v4` to upload files from `*/bin/` (Linux/macOS) and `*\\bin\\*` (Windows).
-- If the workflow is running on a tag (`refs/tags/*`) and packaging is enabled, it attaches all `*/bin/*` files to a GitHub Release using `softprops/action-gh-release@v1`.
+- Uses `actions/upload-artifact@v7` to upload files from `*/bin/` (Linux/macOS) and `*\\bin\\*` (Windows).
+- If the workflow is running on a tag (`refs/tags/*`) and packaging is enabled, it attaches all `*/bin/*` files to a GitHub Release using `softprops/action-gh-release@v3`.
 - Composes a descriptive artifact name using discovery metadata: `<build-name>_<OS>_<ARCH>_<TAG|SHORTSHA>`.
 - Optionally writes a small `artifact_meta.json` (enabled by default) alongside the uploaded artifacts with discovery info for downstream automation.
 

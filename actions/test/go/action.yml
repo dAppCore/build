@@ -170,7 +170,7 @@ runs:
 
     - name: Upload coverage to Codecov
       if: inputs.codecov == 'true' && steps.detect.outputs.TESTS_RUN == '1'
-      uses: codecov/codecov-action@v5
+      uses: codecov/codecov-action@v7
       with:
         files: ${{ inputs.app-working-directory }}/${{ inputs.go-directory && format('{0}/', inputs.go-directory) || '' }}coverage.out
         token: ${{ inputs.codecov-token }}

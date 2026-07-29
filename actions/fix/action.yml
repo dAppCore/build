@@ -43,13 +43,13 @@ runs:
 
     - name: Setup Go
       if: steps.detect.outputs.LANG == 'go'
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v7
       with:
         go-version: ${{ inputs.go-version }}
 
     - name: Setup Node
       if: steps.detect.outputs.LANG == 'node'
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v7
       with:
         node-version: ${{ inputs.node-version }}
 

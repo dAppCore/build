@@ -41,7 +41,7 @@ runs:
     # Linux and Windows runners, which ship a Go, and a "go: command not found"
     # on macOS, which does not.
     - name: Setup GoLang
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v7
       with:
         check-latest: true
         cache: ${{ inputs.build-cache }}

@@ -93,6 +93,6 @@ runs:
     # invokes it itself via -upx. (Nicola, #48)
     - name: Install UPX
       if: inputs.upx == 'true'
-      uses: crazy-max/ghaction-upx@v3
+      uses: crazy-max/ghaction-upx@v4
       with:
         install-only: true

@@ -50,7 +50,7 @@ runs:
   using: "composite"
   steps:
     - name: Setup Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v7
       with:
         go-version: ${{ inputs.go-version }}
         # Keyed on the module's own go.sum, wherever it lives. Nicola made the

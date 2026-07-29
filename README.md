@@ -7,7 +7,7 @@ One GitHub Action that reads your repository, works out what it is, and builds
 it — Wails v3, Wails v2, Go and C++, on Linux, macOS and Windows.
 
 ```yaml
-- uses: actions/checkout@v4
+- uses: actions/checkout@v7
 - uses: dAppCore/build@v4.16.0
   with:
     build-name: myApp
@@ -56,7 +56,7 @@ strategy:
     os: [ubuntu-latest, macos-latest, windows-latest]
 runs-on: ${{ matrix.os }}
 steps:
-  - uses: actions/checkout@v4
+  - uses: actions/checkout@v7
   - uses: dAppCore/build@v4.16.0
     with:
       build-name: myApp

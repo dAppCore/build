@@ -35,8 +35,8 @@ jobs:
     name: Action contracts (outputs have values, inputs are described)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.x'
       - run: pip install --quiet pyyaml
@@ -50,7 +50,7 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - id: disc
         uses: ./actions/discovery
       - name: Assert outputs (bash)
@@ -101,7 +101,7 @@ jobs:
           - { dir: 'tdd/node-only', expect: 'node', expect_root_pkg: '1', expect_frontend_pkg: '0', expect_go_mod: '0', expect_main_go: '0', expect_cmake: '0' }
           - { dir: 'tdd/docs', expect: 'unknown', expect_root_pkg: '0', expect_frontend_pkg: '0', expect_go_mod: '0', expect_main_go: '0', expect_cmake: '0' }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - id: disc
         uses: ./actions/discovery
         with:
@@ -144,7 +144,7 @@ jobs:
           - { distro: '22.04', obf: 'false', nsis: 'false', tags: 'false', expect_webkit: 'false', upx: 'true', expect_flag: '-upx' }
           - { distro: '22.04', obf: 'false', nsis: 'false', tags: 'false', expect_webkit: 'false', upx: 'true', upx_flags: '--best --lzma', expect_flag: "-upxflags='--best --lzma'" }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - id: opts
         uses: ./actions/options
         with:
@@ -197,7 +197,7 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Setup Go/Wails
         uses: ./actions/setup/go
         with:
@@ -222,7 +222,7 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install core
         id: core
         uses: ./actions/setup/core
@@ -270,7 +270,7 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Setup Node/npm (no install)
         uses: ./actions/setup/npm
         with:
@@ -288,7 +288,7 @@ jobs:
     name: Setup Conan sub-action (Linux only)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Setup Conan
         uses: ./actions/setup/conan
       - name: Assert conan is on PATH
@@ -305,7 +305,7 @@ jobs:
 #    name: Setup Deno sub-action behavior (skip vs enable)
 #    runs-on: ubuntu-latest
 #    steps:
-#      - uses: actions/checkout@v4
+#      - uses: actions/checkout@v7
 #      - name: Skip path (no env)
 #        uses: ./actions/setup/deno
 #      - name: Enable via env and run a command
@@ -321,7 +321,7 @@ jobs:
     name: Package sub-action with dummy artifact (Ubuntu)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Prepare dummy artifact
         shell: bash
         run: |
@@ -343,7 +343,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: package-tests
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
       - name: Prepare dummy artifact
@@ -413,7 +413,7 @@ jobs:
     name: Sub-actions smoke (workflow-local ./actions/*)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Discovery (workflow-local path)
         id: disc
         uses: ./actions/discovery
@@ -434,7 +434,7 @@ jobs:
     name: Auto stack routing smoke (root action on Wails2-like repo)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Run root action with AUTO_STACK in tdd/wails2-root
         id: root
         uses: ./
@@ -466,7 +466,7 @@ jobs:
           - os: windows-latest
             platform: windows/amd64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
       - name: Prepare dummy artifact
@@ -497,7 +497,7 @@ jobs:
           - os: windows-latest
             platform: windows/amd64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
       - name: Run wails2 wrapper locally
@@ -515,7 +515,7 @@ jobs:
 #    name: Deno env-first path (root action on Ubuntu)
 #    runs-on: ubuntu-latest
 #    steps:
-#      - uses: actions/checkout@v4
+#      - uses: actions/checkout@v7
 #      - name: Configure Deno via $GITHUB_ENV
 #        run: |
 #          echo "DENO_ENABLE=true" >> "$GITHUB_ENV"
@@ -535,7 +535,7 @@ jobs:
     needs: [action-contracts, discovery-tests, discovery-fixture-tests]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Configure WAILS_* via $GITHUB_ENV
         run: |
           echo "WAILS_OBFUSCATE=true" >> "$GITHUB_ENV"
@@ -560,7 +560,7 @@ jobs:
     needs: [action-contracts, discovery-tests, discovery-fixture-tests]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Configure WAILS_* via $GITHUB_ENV (wrapper)
         run: |
           echo "WAILS_OBFUSCATE=true" >> "$GITHUB_ENV"
@@ -599,7 +599,7 @@ jobs:
     needs: [package-tests]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Discovery example
         id: disc
         uses: ./actions/discovery
@@ -634,7 +634,7 @@ jobs:
     name: Published dAppCore/build@v4 resolves
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Discovery, from the tag
         id: disc
         uses: dAppCore/build/actions/discovery@v4
@@ -654,7 +654,7 @@ jobs:
     needs: [setup-go-tests, setup-npm-tests]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build with action
         uses: ./
         with:
@@ -696,7 +696,7 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build with the go stack
         id: go
         uses: ./actions/build/go
@@ -754,7 +754,7 @@ jobs:
     needs: [action-contracts]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build a module that has no *_test.go
         id: go
         uses: ./actions/build/go
@@ -780,7 +780,7 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build with the node stack
         id: node
         uses: ./actions/build/node
@@ -811,7 +811,7 @@ jobs:
         pm: [pnpm, yarn]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build with the node stack
         id: node
         uses: ./actions/build/node
@@ -837,7 +837,7 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build with the deno stack
         id: deno
         uses: ./actions/build/deno
@@ -867,7 +867,7 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build with the cpp stack
         id: cpp
         uses: ./actions/build/cpp
@@ -902,7 +902,7 @@ jobs:
           - { os: windows-latest, binary: 'bin/wails3-fixture.exe' }
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build with the wails3 stack
         uses: ./actions/build/wails3
         with:

@@ -32,7 +32,7 @@ jobs:
       DENO_WORKDIR: 'frontend'
       DENO_BUILD: 'deno task build'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dAppCore/build@v4
         with:
           build-name: myApp
