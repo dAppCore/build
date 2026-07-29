@@ -79,6 +79,18 @@ inputs:
     description: "Wails v3 stack: how long to keep the workflow artifact"
     required: false
     default: "7"
+  go-version:
+    description: "Go toolchain version for stacks that install one"
+    required: false
+    default: "1.26"
+  node-version:
+    description: "Node version for stacks with a frontend toolchain"
+    required: false
+    default: "22"
+  npm-working-directory:
+    description: "Where the frontend package.json lives"
+    required: false
+    default: "."
   wails3-command:
     description: >
       Wails v3 stack: which wails3 CLI verb to run — `build` for the bare
@@ -156,6 +168,9 @@ runs:
         go-directory: ${{ inputs.go-directory }}
         release-asset-prefix: ${{ inputs.release-asset-prefix }}
         wails3-command: ${{ inputs.wails3-command }}
+        go-version: ${{ inputs.go-version }}
+        node-version: ${{ inputs.node-version }}
+        npm-working-directory: ${{ inputs.npm-working-directory }}
         package-distributables: ${{ inputs.package-distributables }}
         linux-packages: ${{ inputs.linux-packages }}
         upload-artifact: ${{ inputs.upload-artifact }}

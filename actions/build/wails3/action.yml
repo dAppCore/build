@@ -217,14 +217,19 @@ runs:
 
         # ditto rather than zip: it is the only tool that preserves a macOS
         # bundle's structure and code signature through an archive.
+        bundled=0
         if [ -d "bin/$NAME.app" ]; then
           ditto -c -k --keepParent "bin/$NAME.app" "wails3-artifact/$base.zip"
+          bundled=1
         fi
 
         for f in bin/*; do
           [ -f "$f" ] || continue
           case "${f##*/}" in
-            "$NAME")      cp "$f" "wails3-artifact/$base" ;;
+            # On macOS the loose binary is what went *into* the bundle, so
+            # shipping both is 170MB of the same program twice. Elsewhere it is
+            # the deliverable.
+            "$NAME")      [ "$bundled" = "1" ] || cp "$f" "wails3-artifact/$base" ;;
             "$NAME.exe")  cp "$f" "wails3-artifact/$base.exe" ;;
             *-installer.exe) cp "$f" "wails3-artifact/$base-installer.exe" ;;
             *.dmg)        cp "$f" "wails3-artifact/$base.dmg" ;;
