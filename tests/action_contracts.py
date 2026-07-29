@@ -150,15 +150,28 @@ def main() -> int:
     # the output. Reach for `--asymmetries` when wiring a new stack or hunting
     # an option that appears to do nothing.
     asymmetries: list[str] = []
+    # Inputs no caller wires at all. The asymmetry report cannot show these —
+    # it compares callers against each other, and unanimous silence looks like
+    # agreement — yet they are the worse case: the option exists on the callee,
+    # is documented there, and cannot be reached through the caller at all. A
+    # workflow that sets one gets no error, because Actions ignores an unknown
+    # `with:` key. That is how `task` reached the wails3 stack and never left
+    # the root action, pinning every v3 build to <os>:build.
+    unreachable: list[str] = []
     for callee, inputs in sorted(wiring.items()):
         for name, callers in sorted(inputs.items()):
             missing = sorted(c for c, ok in callers.items() if not ok)
-            if missing and len(missing) != len(callers):
-                has = sorted(c for c, ok in callers.items() if ok)
-                asymmetries.append(
-                    f"  {callee} :: {name}\n"
-                    f"      wired by  {', '.join(has)}\n"
-                    f"      not by    {', '.join(missing)}")
+            if not missing:
+                continue
+            if len(missing) == len(callers):
+                unreachable.append(f"  {callee} :: {name}\n"
+                                   f"      reached by no caller ({', '.join(missing)})")
+                continue
+            has = sorted(c for c, ok in callers.items() if ok)
+            asymmetries.append(
+                f"  {callee} :: {name}\n"
+                f"      wired by  {', '.join(has)}\n"
+                f"      not by    {', '.join(missing)}")
 
     if problems:
         print("\n".join(f"  {p}" for p in problems))
@@ -170,9 +183,12 @@ def main() -> int:
         print(f"\n{len(asymmetries)} input(s) wired by some callers of a callee "
               f"and not others:\n")
         print("\n".join(asymmetries))
-    elif asymmetries:
-        print(f"({len(asymmetries)} caller asymmetries — "
-              f"run with --asymmetries to list them)")
+        print(f"\n{len(unreachable)} input(s) no caller wires — settable on the "
+              f"callee, unreachable through it:\n")
+        print("\n".join(unreachable))
+    elif asymmetries or unreachable:
+        print(f"({len(asymmetries)} caller asymmetries, {len(unreachable)} "
+              f"unreachable inputs — run with --asymmetries to list them)")
     return 0
 
 
