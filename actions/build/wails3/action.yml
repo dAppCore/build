@@ -112,6 +112,11 @@ runs:
         sign: ${{ inputs.sign }}
         app-working-directory: ${{ inputs.app-working-directory }}
         build-name: ${{ inputs.build-name }}
+        # v3 writes bin/; the sign action defaults to v2's build/bin/. Left to
+        # the default it reported "this stack produces no bundle" on every v3
+        # macOS build and skipped the zip, the .pkg and the signature — a
+        # notice, so the job stayed green having done none of it.
+        bundle-directory: bin
 
     - name: Package & release
       uses: dAppCore/build/actions/package@v4
