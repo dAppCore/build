@@ -42,6 +42,32 @@ inputs:
     description: "The wails3 CLI verb — build for the binary, package for the installable artefact"
     required: false
     default: "build"
+  package-distributables:
+    description: >
+      Build the platform's distribution formats after the app — the .dmg on
+      macOS and the Linux packages. wails3 covers neither: `darwin:package`
+      makes the .app, `linux:build` makes the ELF, and the rest lives in
+      targets a project would otherwise call from its own workflow.
+    required: false
+    default: "true"
+  linux-packages:
+    description: >
+      Comma-separated Linux formats, run as `linux:generate:<format>`. Defaults
+      to deb and rpm. appimage is deliberately not a default: it downloads
+      linuxdeploy and wants a FUSE mount, which is more than a runner offers
+      out of the box.
+    required: false
+    default: "deb,rpm"
+  upload-artifact:
+    description: >
+      Upload the distributables as a workflow artifact named
+      <build-name>-<os>-<arch>, each file inside carrying that same base name.
+    required: false
+    default: "true"
+  artifact-retention-days:
+    description: "How long to keep the workflow artifact"
+    required: false
+    default: "7"
   wails3-tool:
     description: "How to invoke wails3; defaults to the module-pinned `go tool wails3`"
     required: false
@@ -96,6 +122,31 @@ runs:
         npm-working-directory: ${{ inputs.npm-working-directory }}
         npm-install: 'true'
 
+    # Packaging on Windows means NSIS, and the runner image does not ship it —
+    # it is absent from the windows-2025 tool list. Every v3 project packaging
+    # for Windows needs this, so it belongs to the stack rather than to each
+    # caller's workflow. Before the build, because `wails3 package` invokes
+    # makensis itself.
+    - name: Install NSIS
+      if: runner.os == 'Windows' && inputs.wails3-command == 'package'
+      shell: bash
+      run: |
+        set -euo pipefail
+        NSIS_DIR="/c/Program Files (x86)/NSIS"
+        command -v makensis >/dev/null 2>&1 || choco install nsis -y --no-progress
+        # choco writes the machine PATH, which neither this shell nor the build
+        # step after it inherits — so the install succeeds and makensis stays
+        # "command not found".
+        if ! command -v makensis >/dev/null 2>&1; then
+          test -x "$NSIS_DIR/makensis.exe" \
+            || { echo "::error::NSIS installed but no makensis at $NSIS_DIR"; exit 1; }
+          printf '%s\n' 'C:\Program Files (x86)\NSIS' >> "$GITHUB_PATH"
+          export PATH="$NSIS_DIR:$PATH"
+        fi
+        # -VERSION, not /VERSION: this shell is MSYS and rewrites a leading
+        # slash into a Windows path before makensis sees it.
+        makensis -VERSION
+
     - name: Build the Wails v3 app
       id: build
       uses: dAppCore/build/actions/build/wails3/build@v4
@@ -105,6 +156,97 @@ runs:
         build-name: ${{ inputs.build-name }}
         wails3-command: ${{ inputs.wails3-command }}
         wails3-tool: ${{ inputs.wails3-tool }}
+
+    # What `package` means differs by platform, and wails3 only covers part of
+    # it. `darwin:package` produces the .app but not a .dmg; `linux:build`
+    # produces the ELF but no distribution package. Both have targets for the
+    # rest, and every v3 project would otherwise call them from its own
+    # workflow. Failures here are not fatal — a project without the target
+    # still gets its binary, and a missing .dmg should not lose a good build.
+    - name: Platform distributables
+      if: inputs.build == 'true' && inputs.package-distributables == 'true'
+      shell: bash
+      working-directory: ${{ inputs.app-working-directory }}
+      env:
+        TOOL: ${{ inputs.wails3-tool }}
+        LINUX_PACKAGES: ${{ inputs.linux-packages }}
+      run: |
+        set -uo pipefail
+        case "${RUNNER_OS}" in
+          macOS)
+            $TOOL task darwin:create:dmg \
+              || echo "::warning::darwin:create:dmg failed or is absent; no .dmg"
+            ;;
+          Linux)
+            # generate:*, not create:*: the create targets depend on `build`,
+            # which would compile the whole application a second time. These
+            # consume the binary where the build already left it.
+            $TOOL task linux:generate:dotdesktop >/dev/null 2>&1 || true
+            for fmt in ${LINUX_PACKAGES//,/ }; do
+              $TOOL task "linux:generate:$fmt" \
+                || echo "::warning::linux:generate:$fmt failed or is absent; no .$fmt"
+            done
+            ;;
+        esac
+
+    # One artifact per platform, with every file in it named
+    # <build-name>-<os>-<arch>.<ext>. wails3 writes bin/ with names that are
+    # right for a developer's machine and ambiguous the moment five platforms'
+    # output lands in one directory — lthn.exe and lthn.exe do not distinguish
+    # themselves. A .app is zipped with ditto to survive the upload boundary
+    # with its bundle structure and signature intact.
+    - name: Stage the distributables
+      id: stage
+      if: inputs.build == 'true' && inputs.upload-artifact == 'true'
+      shell: bash
+      working-directory: ${{ inputs.app-working-directory }}
+      env:
+        NAME: ${{ inputs.build-name }}
+        IN_OS: ${{ steps.discovery.outputs.OS }}
+        IN_ARCH: ${{ steps.discovery.outputs.ARCH }}
+      run: |
+        set -euo pipefail
+        case "$(printf '%s' "${IN_OS:-$RUNNER_OS}" | tr '[:upper:]' '[:lower:]')" in
+          *mac*|*darwin*) os=darwin ;;
+          *win*)          os=windows ;;
+          *linux*)        os=linux ;;
+          *)              os="$(printf '%s' "${IN_OS:-unknown}" | tr '[:upper:]' '[:lower:]')" ;;
+        esac
+        base="$NAME-$os-${IN_ARCH:-amd64}"
+        rm -rf .wails3-artifact && mkdir -p .wails3-artifact
+
+        # ditto rather than zip: it is the only tool that preserves a macOS
+        # bundle's structure and code signature through an archive.
+        if [ -d "bin/$NAME.app" ]; then
+          ditto -c -k --keepParent "bin/$NAME.app" ".wails3-artifact/$base.zip"
+        fi
+
+        for f in bin/*; do
+          [ -f "$f" ] || continue
+          case "${f##*/}" in
+            "$NAME")      cp "$f" ".wails3-artifact/$base" ;;
+            "$NAME.exe")  cp "$f" ".wails3-artifact/$base.exe" ;;
+            *-installer.exe) cp "$f" ".wails3-artifact/$base-installer.exe" ;;
+            *.dmg)        cp "$f" ".wails3-artifact/$base.dmg" ;;
+            *.deb)        cp "$f" ".wails3-artifact/$base.deb" ;;
+            *.rpm)        cp "$f" ".wails3-artifact/$base.rpm" ;;
+            *.AppImage)   cp "$f" ".wails3-artifact/$base.AppImage" ;;
+            *.pkg)        cp "$f" ".wails3-artifact/$base.pkg" ;;
+          esac
+        done
+
+        echo "ARTIFACT_NAME=$base" >> "$GITHUB_OUTPUT"
+        echo "[DEBUG_LOG] (wails3) staged for $base:"
+        ls -la .wails3-artifact
+
+    - name: Upload the distributables
+      if: inputs.build == 'true' && inputs.upload-artifact == 'true'
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ steps.stage.outputs.ARTIFACT_NAME }}
+        path: ${{ inputs.app-working-directory }}/.wails3-artifact/*
+        retention-days: ${{ inputs.artifact-retention-days }}
+        if-no-files-found: error
 
     - name: Sign artifacts (OS-conditional)
       uses: dAppCore/build/actions/sign@v4

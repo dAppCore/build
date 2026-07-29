@@ -63,6 +63,22 @@ inputs:
     description: "Base name for release assets, before the -<os>-<arch> suffix"
     required: false
     default: ""
+  package-distributables:
+    description: "Wails v3 stack: build the platform's .dmg / Linux packages after the app"
+    required: false
+    default: "true"
+  linux-packages:
+    description: "Wails v3 stack: comma-separated Linux formats, run as linux:generate:<format>"
+    required: false
+    default: "deb,rpm"
+  upload-artifact:
+    description: "Wails v3 stack: upload the distributables as a workflow artifact"
+    required: false
+    default: "true"
+  artifact-retention-days:
+    description: "Wails v3 stack: how long to keep the workflow artifact"
+    required: false
+    default: "7"
   wails3-command:
     description: >
       Wails v3 stack: which wails3 CLI verb to run — `build` for the bare
@@ -140,6 +156,10 @@ runs:
         go-directory: ${{ inputs.go-directory }}
         release-asset-prefix: ${{ inputs.release-asset-prefix }}
         wails3-command: ${{ inputs.wails3-command }}
+        package-distributables: ${{ inputs.package-distributables }}
+        linux-packages: ${{ inputs.linux-packages }}
+        upload-artifact: ${{ inputs.upload-artifact }}
+        artifact-retention-days: ${{ inputs.artifact-retention-days }}
         entry: ${{ inputs.entry }}
         permissions: ${{ inputs.permissions }}
         deb: ${{ inputs.deb }}

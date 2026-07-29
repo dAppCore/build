@@ -64,6 +64,22 @@ inputs:
     description: "Base name for release assets, before the -<os>-<arch> suffix"
     required: false
     default: ""
+  package-distributables:
+    description: "Wails v3 stack: build the platform's .dmg / Linux packages after the app"
+    required: false
+    default: "true"
+  linux-packages:
+    description: "Wails v3 stack: comma-separated Linux formats, run as linux:generate:<format>"
+    required: false
+    default: "deb,rpm"
+  upload-artifact:
+    description: "Wails v3 stack: upload the distributables as a workflow artifact"
+    required: false
+    default: "true"
+  artifact-retention-days:
+    description: "Wails v3 stack: how long to keep the workflow artifact"
+    required: false
+    default: "7"
   wails3-command:
     description: "Wails v3 stack: the wails3 CLI verb — build or package."
     required: false
@@ -181,6 +197,10 @@ runs:
         # step next expects a bundle, so this is the difference between a
         # release that has installers and one that does not.
         wails3-command: ${{ inputs.wails3-command }}
+        package-distributables: ${{ inputs.package-distributables }}
+        linux-packages: ${{ inputs.linux-packages }}
+        upload-artifact: ${{ inputs.upload-artifact }}
+        artifact-retention-days: ${{ inputs.artifact-retention-days }}
 
     - name: Call Go wrapper
       id: go
