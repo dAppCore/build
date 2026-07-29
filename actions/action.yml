@@ -172,6 +172,12 @@ runs:
         build-name: ${{ inputs.build-name }}
         app-working-directory: ${{ inputs.app-working-directory }}
         release-asset-prefix: ${{ inputs.release-asset-prefix }}
+        # The v3 stack runs the project's own Taskfile target, so which target
+        # is the whole configuration. Unforwarded it defaulted to <os>:build on
+        # every caller — a caller asking for a package target got a bare binary
+        # and no error, because Actions ignores a `with:` key the action does
+        # not declare.
+        task: ${{ inputs.task }}
 
     - name: Call Go wrapper
       id: go
