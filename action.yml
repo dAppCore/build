@@ -63,13 +63,13 @@ inputs:
     description: "Base name for release assets, before the -<os>-<arch> suffix"
     required: false
     default: ""
-  task:
+  wails3-command:
     description: >
-      Wails v3 stack: the Taskfile target to run. Empty runs <os>:build, which
-      produces a bare binary — a project wanting the bundle or an installer
-      names its package target here.
+      Wails v3 stack: which wails3 CLI verb to run — `build` for the bare
+      binary, `package` for the platform's installable artefact (.app, the NSIS
+      installer, the Linux packages).
     required: false
-    default: ""
+    default: "build"
   entry:
     description: >
       Deno stack: entry module to compile. Empty probes for run.ts, main.ts,
@@ -139,6 +139,7 @@ runs:
         app-working-directory: ${{ inputs.app-working-directory }}
         go-directory: ${{ inputs.go-directory }}
         release-asset-prefix: ${{ inputs.release-asset-prefix }}
+        wails3-command: ${{ inputs.wails3-command }}
         entry: ${{ inputs.entry }}
         permissions: ${{ inputs.permissions }}
         deb: ${{ inputs.deb }}

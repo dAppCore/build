@@ -38,10 +38,10 @@ inputs:
     description: "Root of the app being built"
     required: false
     default: "."
-  task:
-    description: "Taskfile target; defaults to <os>:build from the runner"
+  wails3-command:
+    description: "The wails3 CLI verb — build for the binary, package for the installable artefact"
     required: false
-    default: ""
+    default: "build"
   wails3-tool:
     description: "How to invoke wails3; defaults to the module-pinned `go tool wails3`"
     required: false
@@ -103,7 +103,7 @@ runs:
         build: ${{ inputs.build }}
         app-working-directory: ${{ inputs.app-working-directory }}
         build-name: ${{ inputs.build-name }}
-        task: ${{ inputs.task }}
+        wails3-command: ${{ inputs.wails3-command }}
         wails3-tool: ${{ inputs.wails3-tool }}
 
     - name: Sign artifacts (OS-conditional)
