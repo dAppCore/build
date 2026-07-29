@@ -141,6 +141,13 @@ runs:
       if: inputs.run-vuln == 'true'
       shell: bash
       working-directory: ${{ inputs.app-working-directory }}/${{ inputs.go-directory }}
+      # GOTOOLCHAIN=auto covers only the install. setup-go v6 pins it to local,
+      # which makes the project's Go version govern what a tool may be built
+      # with — and govulncheck@latest tracks the current Go, so any project a
+      # release or two behind stops being able to install it. govulncheck then
+      # runs against the project's own toolchain as before.
+      env:
+        GOTOOLCHAIN: auto
       run: |
         go install golang.org/x/vuln/cmd/govulncheck@latest
         GOWORK=off govulncheck ./...

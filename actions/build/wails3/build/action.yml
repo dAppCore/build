@@ -85,7 +85,9 @@ runs:
             exit 0
           fi
           echo "::warning::no go.mod tool directive for wails3; installing the CLI"
-          go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+          # See setup/go: the Go a tool is compiled with is not the Go the
+          # project builds with, and setup-go v6 stopped distinguishing them.
+          GOTOOLCHAIN=auto go install github.com/wailsapp/wails/v3/cmd/wails3@latest
         fi
 
     - name: Build

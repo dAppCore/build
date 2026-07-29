@@ -47,13 +47,29 @@ runs:
         cache: ${{ inputs.build-cache }}
         cache-dependency-path: ${{ inputs.build-dependency-path }}
         go-version: ${{ inputs.go-version }}
+    # GOTOOLCHAIN=auto for this one install. setup-go v6 began pinning
+    # GOTOOLCHAIN=local, so the project's Go version also governs what toolchain
+    # a *tool* may be built with — and garble v0.17.0 wants 1.26.2, so a project
+    # on anything older stopped being able to install it at all:
+    #
+    #   mvdan.cc/garble@v0.17.0 requires go >= 1.26.2 (running go 1.23.12;
+    #   GOTOOLCHAIN=local)
+    #
+    # Scoped to the step, so the build that follows still uses exactly the Go
+    # the caller asked for. What garble is compiled with is its own business.
     - name: Install Garble
       if: inputs.build-obfuscate == 'true'
+      env:
+        GOTOOLCHAIN: auto
       run: go install mvdan.cc/garble@latest
       shell: bash
     - run: go version
       shell: bash
+    # Same reasoning as garble above: this is a tool, and the Go it is compiled
+    # with is not the Go the project builds with.
     - name: Install Wails
       if: inputs.install-wails == 'true' && inputs.wails-dev-build == 'false'
+      env:
+        GOTOOLCHAIN: auto
       run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ inputs.wails-version }}
       shell: bash
