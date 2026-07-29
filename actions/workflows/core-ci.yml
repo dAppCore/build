@@ -19,7 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dAppCore/build/actions/build/core@main
+      - uses: dAppCore/build/actions/build/core@v4
         with:
           go-version: "1.26"
           run-vet: "true"

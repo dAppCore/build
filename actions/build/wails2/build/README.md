@@ -14,7 +14,7 @@ Inputs
 Usage
 ```yaml
 - name: Build Wails app
-  uses: dAppCore/build/actions/build/wails2/build@main
+  uses: dAppCore/build/actions/build/wails2/build@v4
   with:
     build: 'true'
     app-working-directory: 'build/wails2'  # or your project dir

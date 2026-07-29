@@ -42,7 +42,7 @@ Behavior
 Usage
 ```yaml
 - name: Setup toolchains
-  uses: dAppCore/build/actions/setup@main
+  uses: dAppCore/build/actions/setup@v4
   with:
     go-version: '1.23'
     build-cache: 'true'

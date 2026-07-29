@@ -47,7 +47,7 @@ runs:
   steps:
     - name: Build
       id: build
-      uses: dAppCore/build/actions/build/node/build@main
+      uses: dAppCore/build/actions/build/node/build@v4
       with:
         build: ${{ inputs.build }}
         app-working-directory: ${{ inputs.app-working-directory }}

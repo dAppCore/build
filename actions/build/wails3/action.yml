@@ -69,7 +69,7 @@ runs:
   steps:
     - name: Discovery
       id: discovery
-      uses: dAppCore/build/actions/discovery@main
+      uses: dAppCore/build/actions/discovery@v4
       with:
         working-directory: ${{ inputs.app-working-directory }}
 
@@ -88,7 +88,7 @@ runs:
           libgtk-4-dev libwebkitgtk-6.0-dev pkg-config build-essential
 
     - name: Setup toolchains (Go/Node)
-      uses: dAppCore/build/actions/setup@main
+      uses: dAppCore/build/actions/setup@v4
       with:
         go-version: ${{ inputs.go-version }}
         build-cache: ${{ inputs.build-cache }}
@@ -98,7 +98,7 @@ runs:
 
     - name: Build the Wails v3 app
       id: build
-      uses: dAppCore/build/actions/build/wails3/build@main
+      uses: dAppCore/build/actions/build/wails3/build@v4
       with:
         build: ${{ inputs.build }}
         app-working-directory: ${{ inputs.app-working-directory }}
@@ -107,14 +107,14 @@ runs:
         wails3-tool: ${{ inputs.wails3-tool }}
 
     - name: Sign artifacts (OS-conditional)
-      uses: dAppCore/build/actions/sign@main
+      uses: dAppCore/build/actions/sign@v4
       with:
         sign: ${{ inputs.sign }}
         app-working-directory: ${{ inputs.app-working-directory }}
         build-name: ${{ inputs.build-name }}
 
     - name: Package & release
-      uses: dAppCore/build/actions/package@main
+      uses: dAppCore/build/actions/package@v4
       with:
         package: ${{ inputs.package }}
         build-name: ${{ inputs.build-name }}

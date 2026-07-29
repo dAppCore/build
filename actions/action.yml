@@ -151,7 +151,7 @@ runs:
     - name: Call Wails v2 wrapper
       id: w2
       if: steps.sel.outputs.SELECTED_STACK == 'wails2'
-      uses: dAppCore/build/actions/build/wails2@main
+      uses: dAppCore/build/actions/build/wails2@v4
       with:
         build: ${{ inputs.build }}
         sign: ${{ inputs.sign }}
@@ -168,7 +168,7 @@ runs:
     - name: Call Wails v3 wrapper
       id: w3
       if: steps.sel.outputs.SELECTED_STACK == 'wails3'
-      uses: dAppCore/build/actions/build/wails3@main
+      uses: dAppCore/build/actions/build/wails3@v4
       with:
         build: ${{ inputs.build }}
         sign: ${{ inputs.sign }}
@@ -185,7 +185,7 @@ runs:
     - name: Call Go wrapper
       id: go
       if: steps.sel.outputs.SELECTED_STACK == 'go'
-      uses: dAppCore/build/actions/build/go@main
+      uses: dAppCore/build/actions/build/go@v4
       with:
         build: ${{ inputs.build }}
         sign: ${{ inputs.sign }}
@@ -214,7 +214,7 @@ runs:
     - name: Call C++ wrapper
       id: cpp
       if: steps.sel.outputs.SELECTED_STACK == 'cpp'
-      uses: dAppCore/build/actions/build/cpp@main
+      uses: dAppCore/build/actions/build/cpp@v4
       with:
         build: ${{ inputs.build }}
         sign: ${{ inputs.sign }}
@@ -232,7 +232,7 @@ runs:
     - name: Call Node wrapper
       id: node
       if: steps.sel.outputs.SELECTED_STACK == 'node'
-      uses: dAppCore/build/actions/build/node@main
+      uses: dAppCore/build/actions/build/node@v4
       with:
         build: ${{ inputs.build }}
         package: ${{ inputs.package }}
@@ -243,7 +243,7 @@ runs:
     - name: Call Bun wrapper
       id: bun
       if: steps.sel.outputs.SELECTED_STACK == 'bun'
-      uses: dAppCore/build/actions/build/bun@main
+      uses: dAppCore/build/actions/build/bun@v4
       with:
         build: ${{ inputs.build }}
         package: ${{ inputs.package }}
@@ -254,7 +254,7 @@ runs:
     - name: Call Deno wrapper
       id: deno
       if: steps.sel.outputs.SELECTED_STACK == 'deno'
-      uses: dAppCore/build/actions/build/deno@main
+      uses: dAppCore/build/actions/build/deno@v4
       with:
         build: ${{ inputs.build }}
         sign: ${{ inputs.sign }}
@@ -275,7 +275,7 @@ runs:
     - name: Call Core Go wrapper
       id: core
       if: steps.sel.outputs.SELECTED_STACK == 'core'
-      uses: dAppCore/build/actions/build/core@main
+      uses: dAppCore/build/actions/build/core@v4
       with:
         app-working-directory: ${{ inputs.app-working-directory }}
         go-directory: ${{ inputs.go-directory }}

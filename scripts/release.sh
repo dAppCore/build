@@ -8,15 +8,18 @@
 # is not a version, it is a moving target wearing one. Consumers pin the exact
 # release and upgrade when they choose to.
 #
-# main is the dogfood branch. Its manifests reach for each other at @main, so
-# our own repositories consuming dAppCore/build@main get the whole tree as it
-# is right now, sub-actions included — and a mistake lands on us before it
-# reaches anyone pinning a release.
+# `v4` is a branch, not a tag. It used to be a tag that this repository moved
+# onto each new release, which is the thing being fixed: a ref that moves should
+# look like one. As a branch it is the major line's development head, and the
+# manifests reach for each other at @v4 — so dAppCore/build@v4 gets the whole
+# tree as it stands, sub-actions included, and that is what dAppCore's own
+# repositories consume. A mistake lands on us before it reaches anyone pinned to
+# a release.
 #
-# A release cannot ship those @main references: the root action of vX would run
+# A release cannot ship those @v4 references: the root action of vX would run
 # whatever the sub-actions happen to be that afternoon. So the tag is built on a
 # detached commit with every internal reference rewritten to the version being
-# cut. main keeps its @main references and is never rewritten.
+# cut. The branch keeps its @v4 references and is never rewritten.
 
 set -euo pipefail
 
@@ -74,4 +77,4 @@ echo
 echo "released $VERSION at $(git rev-parse --short HEAD)"
 echo "main is untouched at $(git rev-parse --short "$MAIN")"
 echo "consumers pin:  uses: dAppCore/build@$VERSION"
-echo "we dogfood:     uses: dAppCore/build@main"
+echo "we dogfood:     uses: dAppCore/build@v4"

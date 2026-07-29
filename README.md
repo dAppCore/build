@@ -18,14 +18,17 @@ a workflow artifact, and publishes a GitHub release when the ref is a tag.
 
 ## Versions
 
-Pin an exact release. There is no `@v4` that follows the newest v4 — a tag here
-points at one commit and is never moved onto another, so the build you tested is
-the build you keep getting. Upgrading is a line in your workflow, chosen by you.
+Pin an exact release: `@v4.16.0`. A tag here points at one commit and is never
+moved onto another, so the build you tested is the build you keep getting.
+Upgrading is a line in your workflow, chosen by you.
 
-`@main` is the development branch, and it is what dAppCore's own repositories
-use. Its manifests reach for each other at `@main` too, so consuming it exercises
-the whole tree rather than a new root over frozen sub-actions. It moves without
-warning and it is meant to — better that it breaks for us first.
+`@v4` is a branch — the major line's development head, and what dAppCore's own
+repositories use. Its manifests reach for each other at `@v4` too, so consuming
+it exercises the whole tree rather than a new root over frozen sub-actions. It
+moves without warning and it is meant to — better that it breaks for us first.
+
+It was a tag once, moved onto each release by CI. A ref that moves should look
+like one, so it is a branch now and `@v4` still resolves.
 
 ## Contents
 
@@ -33,7 +36,7 @@ warning and it is meant to — better that it breaks for us first.
 | :-- | :-- |
 | [Quickstart](https://dappco.re/build/quickstart/) | The matrix build, build-only, and apps not at the repository root |
 | [How detection works](https://dappco.re/build/detection/) | What it reads, what it concludes, how to overrule it |
-| [Wails v3](https://dappco.re/build/stacks/wails3/) | Runs your Taskfile target — so CI takes the path you do |
+| [Wails v3](https://dappco.re/build/stacks/wails3/) | Runs `wails3 build` or `wails3 package` — so CI takes the path you do |
 | [Wails v2](https://dappco.re/build/stacks/wails2/) | Composes `wails build` flags from inputs |
 | [Go binaries](https://dappco.re/build/stacks/go/) | A module, a main package, a binary |
 | [C++](https://dappco.re/build/stacks/cpp/) | Conan 2 resolves, CMake builds |

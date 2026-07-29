@@ -1,0 +1,54 @@
+name: v4 branch
+
+# The manifests reach for each other at @v4, so that branch is what every job
+# using dAppCore/build@v4 actually runs — including this repository's own CI.
+# If it lagged main, a change would test green against the previous tree and the
+# sub-action edit in the same commit would simply not be there.
+#
+# A fast-forward, never a force. If v4 has somehow diverged from main this fails
+# and says so, rather than discarding whatever is on it.
+#
+# This moves a branch, which is what branches do. Release tags are cut by
+# scripts/release.sh and never moved by anything.
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: v4-branch
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: fast-forward v4 to main
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fast-forward
+        shell: bash
+        run: |
+          set -euo pipefail
+          MAIN="$(git rev-parse origin/main)"
+
+          if git rev-parse -q --verify origin/v4 >/dev/null; then
+            CURRENT="$(git rev-parse origin/v4)"
+            if [ "$CURRENT" = "$MAIN" ]; then
+              echo "[DEBUG_LOG] v4 already at $MAIN"
+              exit 0
+            fi
+            if ! git merge-base --is-ancestor "$CURRENT" "$MAIN"; then
+              echo "::error::v4 is at $CURRENT, which is not an ancestor of main — fast-forwarding would discard it"
+              exit 1
+            fi
+          fi
+
+          git push origin "$MAIN:refs/heads/v4"
+          echo "[DEBUG_LOG] v4 -> $MAIN"

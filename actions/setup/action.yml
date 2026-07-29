@@ -65,7 +65,7 @@ runs:
   using: "composite"
   steps:
     - name: Setup Go
-      uses: dAppCore/build/actions/setup/go@main
+      uses: dAppCore/build/actions/setup/go@v4
       with:
         build-dependency-path: ${{ inputs.build-dependency-path }}
         go-version: ${{ inputs.go-version }}
@@ -74,20 +74,20 @@ runs:
         wails-version: ${{ inputs.wails-version }}
         wails-dev-build: ${{ inputs.wails-dev-build }}
     - name: Setup Node/npm
-      uses: dAppCore/build/actions/setup/npm@main
+      uses: dAppCore/build/actions/setup/npm@v4
       with:
         node-version: ${{ inputs.node-version }}
         working-directory: ${{ inputs.npm-working-directory }}
         install: ${{ inputs.npm-install }}
     - name: Setup Deno (optional)
-      uses: dAppCore/build/actions/setup/deno@main
+      uses: dAppCore/build/actions/setup/deno@v4
       with:
         deno-build: ${{ inputs.deno-build }}
         deno-version: ${{ inputs.deno-version }}
         deno-working-directory: ${{ inputs.deno-working-directory }}
     - name: Setup Conan (optional)
       if: inputs.conan-enable == 'true'
-      uses: dAppCore/build/actions/setup/conan@main
+      uses: dAppCore/build/actions/setup/conan@v4
 
     # upx is only fetched when asked for. install-only puts it on PATH; wails
     # invokes it itself via -upx. (Nicola, #48)

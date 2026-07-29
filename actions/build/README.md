@@ -19,7 +19,7 @@ Usage examples
   ```
 - From another repo:
   ```yaml
-  - uses: dAppCore/build/actions/build/wails2@main
+  - uses: dAppCore/build/actions/build/wails2@v4
     with:
       build-name: myApp
       build-platform: linux/amd64
