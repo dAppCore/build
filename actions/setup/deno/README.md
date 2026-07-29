@@ -26,7 +26,7 @@ Inputs (fallbacks)
 Usage (direct)
 ```yaml
 - name: Setup Deno (direct)
-  uses: dAppCore/build/actions/setup/deno@v4
+  uses: dAppCore/build/actions/setup/deno@main
   with:
     deno-version: 'v1.44.x'
     deno-working-directory: 'frontend'
@@ -42,7 +42,7 @@ Usage (ENV-first; recommended)
     echo "DENO_WORKDIR=frontend" >> "$GITHUB_ENV"
     echo "DENO_BUILD=deno task build" >> "$GITHUB_ENV"
 - name: Setup toolchains (orchestrator)
-  uses: dAppCore/build/actions/setup@v4
+  uses: dAppCore/build/actions/setup@main
 ```
 
 Notes

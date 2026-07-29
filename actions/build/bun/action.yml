@@ -65,7 +65,7 @@ runs:
   steps:
     - name: Discovery
       id: discovery
-      uses: dAppCore/build/actions/discovery@v4
+      uses: dAppCore/build/actions/discovery@main
       with:
         working-directory: ${{ inputs.app-working-directory }}
 
@@ -76,7 +76,7 @@ runs:
 
     - name: Build
       id: build
-      uses: dAppCore/build/actions/build/bun/build@v4
+      uses: dAppCore/build/actions/build/bun/build@main
       with:
         build: ${{ inputs.build }}
         app-working-directory: ${{ inputs.app-working-directory }}
@@ -86,7 +86,7 @@ runs:
         install: ${{ inputs.install }}
 
     - name: Package & release
-      uses: dAppCore/build/actions/package@v4
+      uses: dAppCore/build/actions/package@main
       with:
         package: ${{ inputs.package }}
         build-name: ${{ inputs.build-name }}

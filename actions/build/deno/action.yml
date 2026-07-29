@@ -84,7 +84,7 @@ runs:
   steps:
     - name: Discovery
       id: discovery
-      uses: dAppCore/build/actions/discovery@v4
+      uses: dAppCore/build/actions/discovery@main
       with:
         working-directory: ${{ inputs.app-working-directory }}
 
@@ -116,7 +116,7 @@ runs:
     - name: Danet
       id: danet
       if: steps.fw.outputs.FRAMEWORK == 'danet'
-      uses: dAppCore/build/actions/build/deno/framework/danet@v4
+      uses: dAppCore/build/actions/build/deno/framework/danet@main
       with:
         build: ${{ inputs.build }}
         app-working-directory: ${{ inputs.app-working-directory }}
@@ -131,7 +131,7 @@ runs:
     - name: Plain build
       id: plain
       if: steps.fw.outputs.FRAMEWORK == 'none'
-      uses: dAppCore/build/actions/build/deno/build@v4
+      uses: dAppCore/build/actions/build/deno/build@main
       with:
         build: ${{ inputs.build }}
         app-working-directory: ${{ inputs.app-working-directory }}
@@ -142,14 +142,14 @@ runs:
         output-directory: ${{ inputs.output-directory }}
 
     - name: Sign artifacts (OS-conditional)
-      uses: dAppCore/build/actions/sign@v4
+      uses: dAppCore/build/actions/sign@main
       with:
         sign: ${{ inputs.sign }}
         app-working-directory: ${{ inputs.app-working-directory }}
         build-name: ${{ inputs.build-name }}
 
     - name: Package & release
-      uses: dAppCore/build/actions/package@v4
+      uses: dAppCore/build/actions/package@main
       with:
         package: ${{ inputs.package }}
         build-name: ${{ inputs.build-name }}

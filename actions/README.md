@@ -21,4 +21,4 @@ Stacks under actions/build/
 Notes
 - In composite actions (inside this repo), reference other sub-actions via relative paths like `uses: ./actions/discovery`.
 - In workflows within this repo, reference local actions with `uses: ./actions/<name>` (or the repo root with `uses: ./`).
-- For consumers of this repo, use the fully qualified path, for example: `uses: dAppCore/build/actions/discovery@v4`.
+- For consumers of this repo, use the fully qualified path, for example: `uses: dAppCore/build/actions/discovery@main`.

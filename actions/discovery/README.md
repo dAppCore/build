@@ -40,7 +40,7 @@ Usage
 ```yaml
 - name: Discovery
   id: disc
-  uses: dAppCore/build/actions/discovery@v4
+  uses: dAppCore/build/actions/discovery@main
   with:
     working-directory: build/wails2 # or your app dir
 # Later examples:

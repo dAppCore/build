@@ -128,14 +128,14 @@ runs:
   steps:
     - name: Discovery
       id: discovery
-      uses: dAppCore/build/actions/discovery@v4
+      uses: dAppCore/build/actions/discovery@main
       with:
         working-directory: ${{ inputs.app-working-directory }}
 
     # A plain Go build has no use for the Wails CLI, and pulling it would add a
     # minute to every run.
     - name: Setup Go
-      uses: dAppCore/build/actions/setup/go@v4
+      uses: dAppCore/build/actions/setup/go@main
       with:
         go-version: ${{ inputs.go-version }}
         build-cache: ${{ inputs.build-cache }}
@@ -143,7 +143,7 @@ runs:
 
     - name: Test
       id: test
-      uses: dAppCore/build/actions/test/go@v4
+      uses: dAppCore/build/actions/test/go@main
       with:
         test: ${{ inputs.test }}
         app-working-directory: ${{ inputs.app-working-directory }}
@@ -158,7 +158,7 @@ runs:
 
     - name: Build
       id: build
-      uses: dAppCore/build/actions/build/go/build@v4
+      uses: dAppCore/build/actions/build/go/build@main
       with:
         build: ${{ inputs.build }}
         app-working-directory: ${{ inputs.app-working-directory }}
@@ -173,14 +173,14 @@ runs:
         output-directory: ${{ inputs.output-directory }}
 
     - name: Sign artifacts (OS-conditional)
-      uses: dAppCore/build/actions/sign@v4
+      uses: dAppCore/build/actions/sign@main
       with:
         sign: ${{ inputs.sign }}
         app-working-directory: ${{ inputs.app-working-directory }}
         build-name: ${{ inputs.build-name }}
 
     - name: Package & release
-      uses: dAppCore/build/actions/package@v4
+      uses: dAppCore/build/actions/package@main
       with:
         package: ${{ inputs.package }}
         build-name: ${{ inputs.build-name }}

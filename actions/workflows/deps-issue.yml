@@ -36,7 +36,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dAppCore/build/actions/deps@dev
+      - uses: dAppCore/build/actions/deps@main
         with:
           go-mod-dir: go
           dry-run: ${{ github.event.inputs.dry-run || 'false' }}

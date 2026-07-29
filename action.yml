@@ -123,13 +123,13 @@ runs:
   steps:
     - name: Discovery
       id: discovery
-      uses: dAppCore/build/actions/discovery@v4
+      uses: dAppCore/build/actions/discovery@main
       with:
         working-directory: ${{ inputs.app-working-directory }}
 
     - name: Delegate to directory orchestrator
       id: dir_orch
-      uses: dAppCore/build/actions@v4
+      uses: dAppCore/build/actions@main
       with:
         build: ${{ inputs.build }}
         sign: ${{ inputs.sign }}

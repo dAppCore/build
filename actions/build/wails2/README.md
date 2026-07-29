@@ -9,7 +9,7 @@ Purpose
 Usage (recommended)
 ```yaml
 - name: Build Wails v2
-  uses: dAppCore/build/actions/build/wails2@v4
+  uses: dAppCore/build/actions/build/wails2@main
   with:
     build-name: wailsApp
     build-platform: linux/amd64 # or windows/amd64, darwin/universal
@@ -42,7 +42,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-      - uses: dAppCore/build@v4
+      - uses: dAppCore/build@main
         with:
           build-name: ${{ matrix.build.name }}
           build-platform: ${{ matrix.build.platform }}
@@ -61,7 +61,7 @@ to `codesign --entitlements` when present, and skipped when not.
 
 Workflow snippet
 ```yaml
-- uses: dAppCore/build@v4
+- uses: dAppCore/build@main
   with:
     build-name: wailsApp
     sign: true

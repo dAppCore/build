@@ -30,7 +30,7 @@ Required project files (macOS)
 Usage
 ```yaml
 - name: Sign artifacts
-  uses: dAppCore/build/actions/sign@v4
+  uses: dAppCore/build/actions/sign@main
   with:
     sign: 'true'
     app-working-directory: '.'

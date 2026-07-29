@@ -8,13 +8,24 @@ it — Wails v3, Wails v2, Go and C++, on Linux, macOS and Windows.
 
 ```yaml
 - uses: actions/checkout@v4
-- uses: dAppCore/build@v4
+- uses: dAppCore/build@v4.16.0
   with:
     build-name: myApp
 ```
 
 That detects the stack, installs the toolchains, builds, uploads the result as
 a workflow artifact, and publishes a GitHub release when the ref is a tag.
+
+## Versions
+
+Pin an exact release. There is no `@v4` that follows the newest v4 — a tag here
+points at one commit and is never moved onto another, so the build you tested is
+the build you keep getting. Upgrading is a line in your workflow, chosen by you.
+
+`@main` is the development branch, and it is what dAppCore's own repositories
+use. Its manifests reach for each other at `@main` too, so consuming it exercises
+the whole tree rather than a new root over frozen sub-actions. It moves without
+warning and it is meant to — better that it breaks for us first.
 
 ## Contents
 
@@ -43,7 +54,7 @@ strategy:
 runs-on: ${{ matrix.os }}
 steps:
   - uses: actions/checkout@v4
-  - uses: dAppCore/build@v4
+  - uses: dAppCore/build@v4.16.0
     with:
       build-name: myApp
 ```
@@ -51,7 +62,7 @@ steps:
 ### Build without publishing
 
 ```yaml
-- uses: dAppCore/build@v4
+- uses: dAppCore/build@v4.16.0
   with:
     build-name: myApp
     package: false
@@ -60,13 +71,13 @@ steps:
 ### Pick the stack yourself
 
 ```yaml
-- uses: dAppCore/build@v4
+- uses: dAppCore/build@v4.16.0
   with:
     build-name: myApp
     STACK: wails3
 ```
 
-Or call a stack directly: `dAppCore/build/actions/build/wails3@v4`.
+Or call a stack directly: `dAppCore/build/actions/build/wails3@v4.16.0`.
 
 ---
 

@@ -67,8 +67,39 @@ def callee_path(uses: str) -> pathlib.Path | None:
     return path if path.is_file() else None
 
 
+def internal_refs() -> dict[str, list[str]]:
+    """Every `uses: dAppCore/build...@REF` in the repository, grouped by REF.
+
+    A release pins these to the tag being cut. If they disagree, the root action
+    of one version is reaching for sub-actions of another — which is invisible
+    at the call site and produces a build nobody described.
+    """
+    found: dict[str, list[str]] = {}
+    for path in action_files():
+        for i, line in enumerate(path.read_text().split("\n"), 1):
+            for ref in re.findall(
+                    r"uses:\s*dAppCore/build[A-Za-z0-9/._-]*@([A-Za-z0-9._-]+)", line):
+                found.setdefault(ref, []).append(f"{path.relative_to(ROOT)}:{i}")
+    return found
+
+
 def main() -> int:
     problems: list[str] = []
+
+    # One ref across the tree. Releases pin these together; a stray one means a
+    # half-applied bump, and the half that did not move keeps running the
+    # previous release's code under the new version's name.
+    refs = internal_refs()
+    if len(refs) > 1:
+        summary = ", ".join(
+            f"{ref} ({len(sites)} site{'s' if len(sites) != 1 else ''})"
+            for ref, sites in sorted(refs.items()))
+        problems.append(
+            f"internal action references disagree: {summary} — a release pins "
+            f"them all to the tag being cut")
+        for ref, sites in sorted(refs.items()):
+            for site in sites[:4]:
+                problems.append(f"  {site}: @{ref}")
     # callee -> input -> {caller: forwards?}, for the asymmetry report below.
     wiring: dict[str, dict[str, dict[str, bool]]] = {}
 

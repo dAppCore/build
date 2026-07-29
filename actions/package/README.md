@@ -18,7 +18,7 @@ Inputs
 Usage
 ```yaml
 - name: Package & Release
-  uses: dAppCore/build/actions/package@v4
+  uses: dAppCore/build/actions/package@main
   with:
     package: 'true'
     build-name: 'wailsApp'

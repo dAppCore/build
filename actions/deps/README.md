@@ -20,7 +20,7 @@ on demand (`workflow_dispatch`, with a `dry-run` preview), and on an upstream
 `repository_dispatch` of type `dep-bump`.
 
 ```yaml
-- uses: dAppCore/build/actions/deps@dev
+- uses: dAppCore/build/actions/deps@main
   with:
     go-mod-dir: go          # directory holding go.mod (Core repos: the go/ subdir)
   env:
