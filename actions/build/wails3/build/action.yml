@@ -1,13 +1,14 @@
 name: "Build Wails v3 App"
 description: >
-  Builds a Wails v3 application through its Taskfile and normalises the
-  executable bits per OS.
+  Builds or packages a Wails v3 application through the wails3 CLI and
+  normalises the executable bits per OS.
 
-  Wails v3 is not v2 with a new flag set. There is no `wails build` invocation
-  to compose: the project owns a Taskfile, wails3 runs targets in it, and the
-  per-platform targets are where the real build lives. So this action runs the
-  project's own target rather than reconstructing the command, which keeps CI
-  and a developer's local build the same path.
+  Wails v3 is not v2 with a new flag set — there are no build flags to compose,
+  because a v3 project describes its own build. But the CLI still owns the
+  verbs: `wails3 build` and `wails3 package`. Both dispatch to the project's
+  build description internally, which is Wails' business rather than this
+  action's, so this runs the verb and lets Wails decide what it means. CI and a
+  developer's machine then take the same path through the same tool.
 
 inputs:
   build:
@@ -21,12 +22,13 @@ inputs:
   build-name:
     description: "Binary or bundle name, used to locate the output"
     required: true
-  task:
+  wails3-command:
     description: >
-      Taskfile target to run. Defaults to <os>:build, resolved from the runner —
-      darwin:build, linux:build, windows:build — which is the wails3 convention.
+      Which wails3 CLI verb to run: `build` for the bare binary, `package` for
+      the platform's installable artefact — the .app bundle, the NSIS
+      installer, the Linux packages.
     required: false
-    default: ""
+    default: "build"
   wails3-tool:
     description: >
       How to invoke wails3. Defaults to `go tool wails3`, which resolves the
@@ -37,33 +39,33 @@ inputs:
     default: "go tool wails3"
 
 outputs:
-  TASK_RUN:
-    description: "The Taskfile target that was executed"
-    value: ${{ steps.target.outputs.TASK }}
+  WAILS3_COMMAND:
+    description: "The wails3 verb that was executed"
+    value: ${{ steps.verb.outputs.COMMAND }}
 
 runs:
   using: "composite"
   steps:
-    - name: Resolve the Taskfile target
-      id: target
+    # Only the two verbs. Anything else would reach the CLI as a subcommand it
+    # does not have, and the failure would name wails3 rather than the caller
+    # that asked for it.
+    - name: Resolve the wails3 verb
+      id: verb
       shell: bash
-      working-directory: ${{ inputs.app-working-directory }}
       env:
-        REQUESTED: ${{ inputs.task }}
+        REQUESTED: ${{ inputs.wails3-command }}
       run: |
         set -euo pipefail
-        if [ -n "$REQUESTED" ]; then
-          TASK="$REQUESTED"
-        else
-          case "${RUNNER_OS}" in
-            macOS)   TASK="darwin:build" ;;
-            Linux)   TASK="linux:build" ;;
-            Windows) TASK="windows:build" ;;
-            *) echo "::error::unsupported runner OS '${RUNNER_OS}'"; exit 1 ;;
-          esac
-        fi
-        echo "TASK=$TASK" >> "$GITHUB_OUTPUT"
-        echo "[DEBUG_LOG] (wails3) target=$TASK"
+        COMMAND="${REQUESTED:-build}"
+        case "$COMMAND" in
+          build|package) ;;
+          *)
+            echo "::error::wails3-command must be 'build' or 'package', got '$COMMAND'"
+            exit 1
+            ;;
+        esac
+        echo "COMMAND=$COMMAND" >> "$GITHUB_OUTPUT"
+        echo "[DEBUG_LOG] (wails3) command=$COMMAND"
 
     # A project that pins wails3 with a go.mod tool directive builds with the
     # version it was tested against. Falling back to an install is for projects
@@ -86,20 +88,11 @@ runs:
           go install github.com/wailsapp/wails/v3/cmd/wails3@latest
         fi
 
-    - name: Install Task
-      shell: bash
-      run: |
-        set -euo pipefail
-        if ! command -v task >/dev/null 2>&1; then
-          go install github.com/go-task/task/v3/cmd/task@latest
-          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
-        fi
-
     - name: Build
       if: inputs.build == 'true'
       shell: bash
       working-directory: ${{ inputs.app-working-directory }}
-      run: ${{ inputs.wails3-tool }} task ${{ steps.target.outputs.TASK }}
+      run: ${{ inputs.wails3-tool }} ${{ steps.verb.outputs.COMMAND }}
 
     # wails3 writes to bin/. The bundle layout differs per platform, so the
     # executable bit is set where each platform actually keeps the binary.

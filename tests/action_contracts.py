@@ -108,6 +108,21 @@ def main() -> int:
 
         # Inputs need a description or the marketplace listing renders blanks.
         declared = (doc.get("inputs") or {})
+
+        # ${{ inputs.X }} where X is not declared in *this* file resolves to the
+        # empty string. Nothing warns — not the runner, not the caller, not the
+        # forwarding check above, which only asks whether a name a file declares
+        # gets passed on. Forwarding an input the file never declared satisfies
+        # it while passing nothing, so a chain can be repaired at one hop, report
+        # sound, and still be severed at the next. That is how `task` was added
+        # to the root action and forwarded from the orchestrator, and every
+        # Wails v3 build carried on running its default target.
+        for i, line in enumerate(path.read_text().split("\n"), 1):
+            for ref in re.findall(r"inputs\.([A-Za-z0-9_-]+)", line):
+                if ref not in declared:
+                    problems.append(
+                        f"{rel}:{i}: references inputs.{ref}, which this file does "
+                        f"not declare — it will always be empty")
         for name, spec in declared.items():
             if not isinstance(spec, dict) or not spec.get("description"):
                 problems.append(f"{rel}: input {name} has no description")
