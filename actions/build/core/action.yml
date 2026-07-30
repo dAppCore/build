@@ -10,6 +10,11 @@ inputs:
       Where the module lives, relative to the working directory. A module one
       level down is a normal layout — this action used to run from the
       repository root unconditionally and could not see one.
+
+      Left empty it is detected: the working directory when that holds the
+      go.mod, otherwise go/. Every repo in this ecosystem except core/go keeps
+      its module in go/, so an empty value used to mean the repo root and every
+      one of them answered "go: no modules specified".
     required: false
     default: ""
   go-version:
@@ -49,24 +54,53 @@ outputs:
 runs:
   using: "composite"
   steps:
+    # Resolved before Setup Go, since the cache key needs the module path too,
+    # and reused by every step after. Refuses rather than guessing: a module it
+    # cannot find used to surface later as "no modules specified", which names
+    # neither the directory searched nor the reason.
+    - name: Resolve module directory
+      id: module
+      shell: bash
+      run: |
+        ROOT='${{ inputs.app-working-directory }}'
+        GIVEN='${{ inputs.go-directory }}'
+
+        if [ -n "$GIVEN" ]; then
+          DIR="$ROOT/$GIVEN"
+          if [ ! -f "$DIR/go.mod" ]; then
+            echo "[core] go-directory '$GIVEN' holds no go.mod (looked in $DIR)" >&2
+            exit 1
+          fi
+        elif [ -f "$ROOT/go.mod" ]; then
+          DIR="$ROOT"
+        elif [ -f "$ROOT/go/go.mod" ]; then
+          DIR="$ROOT/go"
+        else
+          echo "[core] no go.mod in $ROOT or $ROOT/go — pass go-directory" >&2
+          exit 1
+        fi
+
+        echo "dir=$DIR" >> "$GITHUB_OUTPUT"
+        echo "[core] module: $DIR ($(head -1 "$DIR/go.mod"))"
+
     - name: Setup Go
       uses: actions/setup-go@v7
       with:
         go-version: ${{ inputs.go-version }}
         # Keyed on the module's own go.sum, wherever it lives. Nicola made the
         # same point in #48 about the wails2 path.
-        cache-dependency-path: ${{ inputs.app-working-directory }}/${{ inputs.go-directory }}/go.sum
+        cache-dependency-path: ${{ steps.module.outputs.dir }}/go.sum
 
     - name: Download dependencies
       shell: bash
-      working-directory: ${{ inputs.app-working-directory }}/${{ inputs.go-directory }}
+      working-directory: ${{ steps.module.outputs.dir }}
       run: |
         GOWORK=off go mod download
         echo "[core] Dependencies downloaded"
 
     - name: Build
       shell: bash
-      working-directory: ${{ inputs.app-working-directory }}/${{ inputs.go-directory }}
+      working-directory: ${{ steps.module.outputs.dir }}
       run: |
         GOWORK=off go build ./...
         echo "[core] Build passed"
@@ -75,7 +109,7 @@ runs:
       id: vet
       if: inputs.run-vet == 'true'
       shell: bash
-      working-directory: ${{ inputs.app-working-directory }}/${{ inputs.go-directory }}
+      working-directory: ${{ steps.module.outputs.dir }}
       run: |
         if GOWORK=off go vet ./... 2>&1; then
           echo "PASSED=1" >> "$GITHUB_OUTPUT"
@@ -89,16 +123,24 @@ runs:
     - name: Test
       id: test
       shell: bash
-      working-directory: ${{ inputs.app-working-directory }}/${{ inputs.go-directory }}
+      working-directory: ${{ steps.module.outputs.dir }}
       run: |
         RACE_FLAG=""
         if [ "${{ inputs.run-race }}" = "true" ]; then
           RACE_FLAG="-race"
         fi
 
-        # Run tests with coverage
+        # Run tests with coverage.
+        #
+        # `set +e` is load-bearing: composite steps run under `bash -e`, so a
+        # failing `go test` aborted the step on the line below and took every
+        # line after it with it — the PASSED=0 output, the coverage extraction
+        # and the coverage-threshold gate were all unreachable, and the
+        # TEST_EXIT below only ever read the 0 of a run that had succeeded.
+        set +e
         GOWORK=off go test ./... -count=1 -timeout 120s $RACE_FLAG -coverprofile=coverage.out 2>&1
         TEST_EXIT=$?
+        set -e
 
         if [ $TEST_EXIT -eq 0 ]; then
           echo "PASSED=1" >> "$GITHUB_OUTPUT"
@@ -126,21 +168,26 @@ runs:
 
         exit $TEST_EXIT
 
+    # Installed rather than skipped-if-absent. The runner image does not ship
+    # golangci-lint, so "not installed, skipping" meant a caller that asked for
+    # lint got a passing step which had linted nothing — the one answer a gate
+    # must never give. GOTOOLCHAIN=auto for the same reason as govulncheck below.
     - name: Lint
       if: inputs.run-lint == 'true'
       shell: bash
-      working-directory: ${{ inputs.app-working-directory }}/${{ inputs.go-directory }}
+      working-directory: ${{ steps.module.outputs.dir }}
+      env:
+        GOTOOLCHAIN: auto
       run: |
-        if command -v golangci-lint >/dev/null 2>&1; then
-          golangci-lint run ./...
-        else
-          echo "[core] golangci-lint not installed, skipping"
+        if ! command -v golangci-lint >/dev/null 2>&1; then
+          go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
         fi
+        GOWORK=off golangci-lint run ./...
 
     - name: Vulnerability check
       if: inputs.run-vuln == 'true'
       shell: bash
-      working-directory: ${{ inputs.app-working-directory }}/${{ inputs.go-directory }}
+      working-directory: ${{ steps.module.outputs.dir }}
       # GOTOOLCHAIN=auto covers only the install. setup-go v6 pins it to local,
       # which makes the project's Go version govern what a tool may be built
       # with — and govulncheck@latest tracks the current Go, so any project a
