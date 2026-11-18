@@ -1,6 +1,7 @@
-name: "Deps — dappco.re bump tracker"
+name: "Deps — dappcore bump tracker"
 description: >
-  Detect dappco.re/* dependencies that have a newer published release and
+  Detect dappcore dependencies (github.com/dappcore/*, and legacy dappco.re/*
+  pins still to migrate) that have a newer published release, and
   open/update (or close) a single tracking issue — turning the dependency
   graph into the ecosystem's version-bump work queue. Open issues carrying the
   'deps' label across every repo ARE the list of bumps to apply.
@@ -28,7 +29,7 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Detect stale dappco.re deps and open/update the tracking issue
+    - name: Detect stale dappcore deps and open/update the tracking issue
       id: detect
       shell: bash
       run: |
@@ -46,17 +47,27 @@ runs:
           echo "[DEBUG_LOG] no go.mod found (looked in $DIR/ and repo root) — nothing to do"
           echo "stale-count=0" >> "$GITHUB_OUTPUT"; exit 0
         fi
-        echo "[DEBUG_LOG] scanning $GOMOD for direct dappco.re/* deps"
+        echo "[DEBUG_LOG] scanning $GOMOD for direct github.com/dappcore/* and dappco.re/* deps"
 
-        # Direct dappco.re/* requires only (drop the module line + // indirect).
-        deps=$(grep -E 'dappco\.re/[^[:space:]]+[[:space:]]+v[0-9]' "$GOMOD" \
+        # Direct requires only (drop the module line + // indirect). Both the
+        # GitHub paths and the legacy dappco.re vanity paths are matched.
+        deps=$(grep -E '(github\.com/dappcore|dappco\.re)/[^[:space:]]+[[:space:]]+v[0-9]' "$GOMOD" \
                  | grep -v '// indirect' \
-                 | grep -oE 'dappco\.re/[^[:space:]]+[[:space:]]+v[0-9]+\.[0-9]+\.[0-9]+' \
+                 | grep -oE '(github\.com/dappcore|dappco\.re)/[^[:space:]]+[[:space:]]+v[0-9]+\.[0-9]+\.[0-9]+' \
                  | sort -u)
 
-        stale=""; n=0
+        stale=""; moves=""; n=0
         while read -r mod cur; do
           [ -n "$mod" ] || continue
+          # A legacy dappco.re pin can't be bumped: tags cut after the move to
+          # github.com/dappcore declare the new path and refuse to load under the
+          # old one. List it as a path move instead of a (wrong) version bump.
+          case "$mod" in
+            dappco.re/*)
+              echo "[DEBUG_LOG] MOVE  $mod $cur (legacy vanity path)"
+              moves="${moves}- [ ] \`${mod}\` \`${cur}\` → its \`github.com/dappcore/…\` path"$'\n'
+              n=$((n+1)); continue ;;
+          esac
           # Highest STABLE published version (@v/list is robust vs @latest's lag).
           latest=$(curl -fsS --max-time 15 "${PROXY}/${mod}/@v/list" 2>/dev/null \
                      | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
@@ -76,18 +87,25 @@ runs:
 
         # All current → close the tracker if one is open, then stop.
         if [ "$n" -eq 0 ]; then
-          echo "[DEBUG_LOG] all dappco.re deps current"
+          echo "[DEBUG_LOG] all dappcore deps current"
           if [ "$DRY" = "true" ]; then echo "(dry-run) would close any open '$TITLE' issue"; exit 0; fi
           num=$(gh issue list --state open --limit 200 --json number,title \
                   --jq ".[] | select(.title==\"$TITLE\") | .number" 2>/dev/null | head -1)
           if [ -n "$num" ]; then
-            gh issue close "$num" --comment "✅ All \`dappco.re/*\` deps current — closing the bump tracker."
+            gh issue close "$num" --comment "✅ All \`github.com/dappcore/*\` deps current — closing the bump tracker."
             echo "[DEBUG_LOG] closed #$num"
           fi
           exit 0
         fi
 
-        body="Upstream \`dappco.re/*\` releases newer than this repo's pins. Bump → PR → merge:"$'\n\n'"${stale}"$'\n'"${MARKER}"
+        body=""
+        if [ -n "$stale" ]; then
+          body="Upstream \`github.com/dappcore/*\` releases newer than this repo's pins. Bump → PR → merge:"$'\n\n'"${stale}"$'\n'
+        fi
+        if [ -n "$moves" ]; then
+          body="${body}Legacy \`dappco.re/*\` pins. Move each to its \`github.com/dappcore\` module path (no version bump applies):"$'\n\n'"${moves}"$'\n'
+        fi
+        body="${body}${MARKER}"
 
         if [ "$DRY" = "true" ]; then
           echo "----- (dry-run) issue title -----"; printf '%s\n' "$TITLE"
@@ -103,7 +121,7 @@ runs:
           gh issue edit "$num" --body "$body" >/dev/null
           echo "[DEBUG_LOG] updated #$num ($n bump(s))"
         else
-          gh label create "$LABEL" --color 0e8a16 --description "Upstream dappco.re version bumps to apply" >/dev/null 2>&1 || true
+          gh label create "$LABEL" --color 0e8a16 --description "Upstream dappcore version bumps to apply" >/dev/null 2>&1 || true
           url=$(gh issue create --title "$TITLE" --label "$LABEL" --body "$body" 2>/dev/null)
           num=$(printf '%s' "$url" | grep -oE '[0-9]+$')
           echo "[DEBUG_LOG] created #$num ($n bump(s)) — $url"
@@ -111,7 +129,7 @@ runs:
         echo "issue=$num" >> "$GITHUB_OUTPUT"
 outputs:
   stale-count:
-    description: "Number of dappco.re deps with a newer published release (0 = all current)."
+    description: "Number of dappcore deps needing action: newer releases plus legacy dappco.re paths to move (0 = all current)."
     value: ${{ steps.detect.outputs.stale-count }}
   issue:
     description: "Issue number of the tracking issue when one was opened or updated."
