@@ -1,11 +1,15 @@
-# actions/deps — dappco.re bump tracker
+# actions/deps — dappcore bump tracker
 
-Turns "an upstream `dappco.re/*` release exists" into a tracked work item.
+Turns "an upstream `github.com/dappcore/*` release exists" into a tracked work item.
 
-The action scans a repo's `go.mod` for **direct** `dappco.re/*` requires, asks the
+The action scans a repo's `go.mod` for **direct** `github.com/dappcore/*` requires, asks the
 Go module proxy for the highest **stable** published version of each, and — if any
 pin is behind — opens (or updates) a single `deps`-labelled issue whose body is a
-checklist of the outstanding bumps. When every dependency is current again it
+checklist of the outstanding bumps.
+
+Legacy `dappco.re/*` pins are listed separately, as **path moves**. Tags cut after
+the move to `github.com/dappcore` declare the new path and won't load under the old
+one, so no version bump applies to a legacy pin. When every dependency is current again it
 **closes** that issue.
 
 The point: open `deps` issues across every repo ARE the ecosystem's version-bump
@@ -33,7 +37,7 @@ on demand (`workflow_dispatch`, with a `dry-run` preview), and on an upstream
 |-------|---------|-------------|
 | `go-mod-dir` | `go` | Directory containing `go.mod`; falls back to the repo root. |
 | `label` | `deps` | Label used to find/track the single bump issue. |
-| `title` | `chore(deps): dappco.re bumps available` | Exact issue title — the idempotency key (one open issue per repo). |
+| `title` | `chore(deps): dappco.re bumps available` | Exact issue title — the idempotency key (one open issue per repo). Kept as-is so existing tracker issues are still found. |
 | `proxy` | `https://proxy.golang.org` | Module proxy base URL used to resolve the latest published version. |
 | `dry-run` | `false` | When `true`, prints the computed title/body and touches no issues (no token needed). |
 
@@ -41,7 +45,7 @@ on demand (`workflow_dispatch`, with a `dry-run` preview), and on an upstream
 
 | Output | Description |
 |--------|-------------|
-| `stale-count` | Number of `dappco.re/*` deps with a newer release (`0` = all current). |
+| `stale-count` | Number of deps needing action: newer `github.com/dappcore/*` releases plus legacy `dappco.re/*` pins to move (`0` = all current). |
 | `issue` | Issue number of the tracking issue when one was opened or updated. |
 
 ## Notes
